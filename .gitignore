@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Editor / local agent state
+.cursor-home/
+.cursor-config/
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Dependencies
+**/node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build output
+backend/dist/
+frontend/.next/
+frontend/out/
+frontend/build/
+coverage/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript / framework artifacts
+**/*.tsbuildinfo
+frontend/next-env.d.ts

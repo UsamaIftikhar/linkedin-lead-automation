@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Lead {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyName     String
+  domain          String?
+  employerWebsite String?
+  email           String?
+  emailConfidence Int?
+  jobTitle        String
+  location        String
+  applyLink       String
+  jobPublisher    String?
+  contacted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@unique([companyName, jobTitle, location, applyLink], map: "lead_company_job_location_apply_unique")
+  @@index([companyName], map: "lead_company_name_idx")
+  @@index([domain], map: "lead_domain_idx")
+  @@index([email], map: "lead_email_idx")
+  @@index([contacted], map: "lead_contacted_idx")
+  @@index([createdAt], map: "lead_created_at_idx")
+}
+
+model UpworkJob {
+  id                  String    @id @default(uuid()) @db.Uuid
+  sourceJobId         String    @unique
+  url                 String
+  title               String
+  description         String    @db.Text
+  publishedAt         DateTime?
+  skills              Json?
+  budgetType          String?
+  budgetTotalUsd      String?
+  hourlyMinUsd        Int?
+  hourlyMaxUsd        Int?
+  experienceLevel     String?
+  location            String?
+  projectLength       String?
+  hoursPerWeek        String?
+  proposals           String?
+  interviewing        String?
+  invitesSent         String?
+  categoryName        String?
+  categoryGroupName   String?
+  clientTotalHires    Int?
+  clientActiveHires   Int?
+  clientSpent         String?
+  clientMemberSince   String?
+  clientCompanySize   String?
+  clientScore         Float?
+  clientFeedbackCount Int?
+  premium             Boolean   @default(false)
+  totalJobsWithHires  Int?
+  openCount           Int?
+  isContractToHire    Boolean?
+  isEnterprise        Boolean?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  proposalDrafts        UpworkProposalDraft[]
+  slackUpworkMessages SlackUpworkJobMessage[]
+
+  @@index([publishedAt], map: "upwork_job_published_at_idx")
+  @@map("upwork_jobs")
+}
+
+model SlackUpworkJobMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  channelId   String   @map("channel_id")
+  messageTs   String   @map("message_ts")
+  upworkJobId String   @map("upwork_job_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  job UpworkJob @relation(fields: [upworkJobId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, messageTs], map: "slack_upwork_job_msg_channel_ts_unique")
+  @@map("slack_upwork_job_messages")
+}
+
+model UpworkProposalDraft {
+  id          String   @id @default(uuid()) @db.Uuid
+  upworkJobId String   @map("upwork_job_id") @db.Uuid
+  body        String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  job UpworkJob @relation(fields: [upworkJobId], references: [id], onDelete: Cascade)
+
+  @@index([upworkJobId], map: "upwork_proposal_draft_job_idx")
+  @@map("upwork_proposal_drafts")
+}
