@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Lead } from '@prisma/client';
-import PQueue from 'p-queue';
 import { Resend } from 'resend';
 import { LeadsService } from '../leads/leads.service';
+import { RateLimitedQueue } from '../shared/utils/rate-limited-queue';
 import type { SendOneEmailDto } from './dto/send-one-email.dto';
 
 interface OutreachTemplateArgs {
@@ -19,11 +19,7 @@ interface OutreachTemplateArgs {
 @Injectable()
 export class EmailsService {
   private readonly logger = new Logger(EmailsService.name);
-  private readonly sendQueue = new PQueue({
-    concurrency: 1,
-    interval: 1000,
-    intervalCap: 1,
-  });
+  private readonly sendQueue = new RateLimitedQueue(1000);
 
   constructor(
     private readonly configService: ConfigService,

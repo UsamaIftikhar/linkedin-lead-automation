@@ -5,11 +5,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import PQueue from 'p-queue';
 import { LeadsService } from '../leads/leads.service';
 import { LeadSeedInput } from '../leads/lead.types';
 import { extractDomain } from '../shared/utils/domain.util';
 import { inferPublisherFromApplyLink } from '../shared/utils/job-publisher.util';
+import { RateLimitedQueue } from '../shared/utils/rate-limited-queue';
 import { FetchJobsQueryDto } from './dto/fetch-jobs-query.dto';
 
 interface JSearchJob {
@@ -44,11 +44,7 @@ const JOB_REQUIREMENTS = new Set([
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
-  private readonly requestQueue = new PQueue({
-    concurrency: 1,
-    interval: 1100,
-    intervalCap: 1,
-  });
+  private readonly requestQueue = new RateLimitedQueue(1100);
 
   constructor(
     private readonly configService: ConfigService,

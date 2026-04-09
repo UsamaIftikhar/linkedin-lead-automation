@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import PQueue from 'p-queue';
 import { isBusinessEmail } from '../shared/utils/email.util';
+import { RateLimitedQueue } from '../shared/utils/rate-limited-queue';
 
 interface HunterEmailResult {
   confidence?: number;
@@ -18,11 +18,7 @@ interface HunterResponse {
 @Injectable()
 export class HunterService {
   private readonly logger = new Logger(HunterService.name);
-  private readonly requestQueue = new PQueue({
-    concurrency: 1,
-    interval: 1100,
-    intervalCap: 1,
-  });
+  private readonly requestQueue = new RateLimitedQueue(1100);
 
   constructor(private readonly configService: ConfigService) {}
 
