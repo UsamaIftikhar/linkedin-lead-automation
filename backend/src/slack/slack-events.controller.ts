@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { waitUntil } from '@vercel/functions';
 import type { Request } from 'express';
 import { verifySlackSigningSecret } from './slack-verify-signature';
 import {
@@ -79,15 +80,19 @@ export class SlackEventsController {
     if (t === 'event_callback') {
       const ev = (body as SlackEventCallback).event;
       if (ev?.type === 'message') {
-        queueMicrotask(() => {
-          void this.slackUpworkThread
-            .handleThreadGenerateCommand(ev as SlackMessageEvent)
+        const messageEvent = ev as SlackMessageEvent;
+        this.logger.log(
+          `Received Slack message event channel=${messageEvent.channel ?? 'unknown'} thread_ts=${messageEvent.thread_ts ?? 'none'} ts=${messageEvent.ts ?? 'none'}`,
+        );
+        waitUntil(
+          this.slackUpworkThread
+            .handleThreadGenerateCommand(messageEvent)
             .catch((err) => {
               this.logger.warn(
                 `Slack async handler error: ${err instanceof Error ? err.message : err}`,
               );
-            });
-        });
+            }),
+        );
       }
       return {};
     }
