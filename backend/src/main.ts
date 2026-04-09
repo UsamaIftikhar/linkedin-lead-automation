@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 const localDevOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '');
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -26,13 +27,31 @@ async function bootstrap() {
     configService
       .get<string>('CORS_ORIGIN')
       ?.split(',')
-      .map((origin) => origin.trim())
+      .map((origin) => normalizeOrigin(origin.trim()))
       .filter(Boolean) ?? [];
 
   app.setGlobalPrefix('api');
   app.use(helmet());
   app.enableCors({
-    origin: corsOrigins.length ? [...corsOrigins, localDevOriginPattern] : true,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (
+        localDevOriginPattern.test(normalizedOrigin) ||
+        !corsOrigins.length ||
+        corsOrigins.includes(normalizedOrigin)
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin ${origin}`), false);
+    },
   });
   app.useGlobalPipes(
     new ValidationPipe({
