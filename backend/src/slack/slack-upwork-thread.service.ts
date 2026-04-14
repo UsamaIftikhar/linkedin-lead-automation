@@ -248,26 +248,41 @@ export class SlackUpworkThreadService {
   async handleThreadGenerateCommand(ev: SlackMessageEvent): Promise<void> {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
     const webhookUrl = this.configService.get<string>('SLACK_WEBHOOK_URL')?.trim();
+    this.logger.log(
+      `Slack thread command received channel=${ev.channel ?? 'unknown'} thread_ts=${ev.thread_ts ?? 'none'} ts=${ev.ts ?? 'none'} subtype=${ev.subtype ?? 'none'} hasBotToken=${Boolean(token)} hasWebhook=${Boolean(webhookUrl)}`,
+    );
     if (!token && !webhookUrl) {
+      this.logger.warn('Slack thread command ignored: no bot token or webhook configured.');
       return;
     }
     if (ev.bot_id) {
+      this.logger.log('Slack thread command ignored: event came from a bot.');
       return;
     }
     if (ev.subtype && SKIP_MESSAGE_SUBTYPES.has(ev.subtype)) {
+      this.logger.log(`Slack thread command ignored: skipped subtype ${ev.subtype}.`);
       return;
     }
     if (!ev.thread_ts || !ev.channel || !ev.ts) {
+      this.logger.warn(
+        `Slack thread command ignored: missing thread/channel/ts channel=${ev.channel ?? 'unknown'} thread_ts=${ev.thread_ts ?? 'none'} ts=${ev.ts ?? 'none'}`,
+      );
       return;
     }
     if (ev.thread_ts === ev.ts) {
+      this.logger.log('Slack thread command ignored: parent thread message, not a reply.');
       return;
     }
     const text = ev.text?.trim() ?? '';
+    this.logger.log(`Slack thread reply text="${text}"`);
     if (!wantsGenerateProposal(text)) {
+      this.logger.log('Slack thread command ignored: text did not match "generate proposal".');
       return;
     }
 
+    this.logger.log(
+      `Looking up Slack thread mapping channel=${ev.channel.trim()} thread_ts=${ev.thread_ts.trim()}`,
+    );
     const row = await this.prisma.slackUpworkJobMessage.findUnique({
       where: {
         channelId_messageTs: {
@@ -282,8 +297,14 @@ export class SlackUpworkThreadService {
       );
       return;
     }
+    this.logger.log(
+      `Slack thread mapping found for upworkJobId=${row.upworkJobId}; starting proposal generation.`,
+    );
 
     const reply = async (t: string) => {
+      this.logger.log(
+        `Posting Slack thread reply channel=${ev.channel} thread_ts=${ev.thread_ts} length=${t.length}`,
+      );
       if (token) {
         const res = await axios.post(
           SLACK_POST_URL,
@@ -328,7 +349,11 @@ export class SlackUpworkThreadService {
 
     try {
       await reply('_Generating proposal…_');
+      this.logger.log(`Generating proposal for upworkJobId=${row.upworkJobId}`);
       const { proposal } = await this.proposalService.generateForUpworkJob(row.upworkJobId);
+      this.logger.log(
+        `Proposal generated for upworkJobId=${row.upworkJobId} length=${proposal.length}`,
+      );
       const parts = chunkForSlack(proposal);
       for (let i = 0; i < parts.length; i += 1) {
         const prefix =
@@ -337,6 +362,9 @@ export class SlackUpworkThreadService {
             : '*Proposal*\n\n';
         await reply(`${prefix}${parts[i]}`);
       }
+      this.logger.log(
+        `Finished posting proposal for upworkJobId=${row.upworkJobId} parts=${parts.length}`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Proposal generation for Slack thread failed: ${msg}`);
