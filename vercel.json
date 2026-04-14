@@ -7,10 +7,7 @@
       },
       "backend": {
         "entrypoint": "backend",
-        "routePrefix": "/_/backend",
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist",
-        "installCommand": "npm install"
+        "routePrefix": "/_/backend"
       }
     }
   }
