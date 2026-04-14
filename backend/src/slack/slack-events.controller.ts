@@ -91,6 +91,9 @@ export class SlackEventsController {
               this.logger.warn(
                 `Slack async handler error: ${err instanceof Error ? err.message : err}`,
               );
+              if (err instanceof Error && err.stack) {
+                this.logger.warn(err.stack);
+              }
             }),
         );
       }

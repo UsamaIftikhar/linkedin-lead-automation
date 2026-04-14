@@ -38,3 +38,4 @@ pnpm-debug.log*
 # TypeScript / framework artifacts
 **/*.tsbuildinfo
 frontend/next-env.d.ts
+.vercel

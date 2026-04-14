@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProposalService } from '../proposals/proposal.service';
@@ -248,42 +249,83 @@ export class SlackUpworkThreadService {
   async handleThreadGenerateCommand(ev: SlackMessageEvent): Promise<void> {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
     const webhookUrl = this.configService.get<string>('SLACK_WEBHOOK_URL')?.trim();
+    this.logger.log(
+      `Slack thread command received channel=${ev.channel ?? 'unknown'} thread_ts=${ev.thread_ts ?? 'none'} ts=${ev.ts ?? 'none'} subtype=${ev.subtype ?? 'none'} bot=${ev.bot_id ? 'yes' : 'no'} text="${(ev.text ?? '').slice(0, 120)}"`,
+    );
     if (!token && !webhookUrl) {
+      this.logger.warn(
+        'Slack thread command ignored because neither SLACK_BOT_TOKEN nor SLACK_WEBHOOK_URL is configured.',
+      );
       return;
     }
     if (ev.bot_id) {
+      this.logger.log('Slack thread command ignored because the event came from a bot.');
       return;
     }
     if (ev.subtype && SKIP_MESSAGE_SUBTYPES.has(ev.subtype)) {
+      this.logger.log(
+        `Slack thread command ignored because subtype=${ev.subtype} is skipped.`,
+      );
       return;
     }
     if (!ev.thread_ts || !ev.channel || !ev.ts) {
+      this.logger.warn(
+        'Slack thread command ignored because channel, thread_ts, or ts is missing.',
+      );
       return;
     }
     if (ev.thread_ts === ev.ts) {
+      this.logger.log('Slack thread command ignored because it is the parent message, not a reply.');
       return;
     }
     const text = ev.text?.trim() ?? '';
     if (!wantsGenerateProposal(text)) {
+      this.logger.log(
+        `Slack thread command ignored because text did not match "generate proposal": "${text.slice(0, 120)}"`,
+      );
       return;
     }
 
-    const row = await this.prisma.slackUpworkJobMessage.findUnique({
-      where: {
-        channelId_messageTs: {
-          channelId: ev.channel.trim(),
-          messageTs: ev.thread_ts.trim(),
+    this.logger.log(
+      `Slack thread command matched "generate proposal"; looking up job mapping for channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
+    );
+
+    let row: { upworkJobId: string } | null;
+    try {
+      row = await this.prisma.slackUpworkJobMessage.findUnique({
+        select: { upworkJobId: true },
+        where: {
+          channelId_messageTs: {
+            channelId: ev.channel.trim(),
+            messageTs: ev.thread_ts.trim(),
+          },
         },
-      },
-    });
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2021'
+      ) {
+        this.logger.error(
+          'Slack thread command lookup failed because table slack_upwork_job_messages is missing. Run `npx prisma db push` for the deployed database.',
+        );
+      }
+      throw err;
+    }
     if (!row) {
       this.logger.warn(
         `Slack: "generate proposal" in thread but no job mapping for channel=${ev.channel} thread_ts=${ev.thread_ts} (post jobs via this app’s bot/webhook so each job gets a stored message ts).`,
       );
       return;
     }
+    this.logger.log(
+      `Slack thread command mapped thread to Upwork job ${row.upworkJobId}; starting proposal generation.`,
+    );
 
     const reply = async (t: string) => {
+      this.logger.log(
+        `Slack thread reply send start channel=${ev.channel} thread_ts=${ev.thread_ts} chars=${t.length} via=${token ? 'bot' : 'webhook'}`,
+      );
       if (token) {
         const res = await axios.post(
           SLACK_POST_URL,
@@ -304,6 +346,9 @@ export class SlackUpworkThreadService {
         if (!data.ok) {
           throw new Error(data.error ?? 'chat.postMessage failed');
         }
+        this.logger.log(
+          `Slack thread reply sent via bot channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
+        );
         return;
       }
       const res = await axios.post(
@@ -318,17 +363,26 @@ export class SlackUpworkThreadService {
         if (!res.data.toLowerCase().includes('ok')) {
           throw new Error(`incoming webhook reply failed: ${res.data.slice(0, 200)}`);
         }
+        this.logger.log(
+          `Slack thread reply sent via webhook channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
+        );
         return;
       }
       const data = res.data as { error?: string; ok?: boolean };
       if (data && typeof data === 'object' && data.ok === false) {
         throw new Error(data.error ?? 'incoming webhook thread reply failed');
       }
+      this.logger.log(
+        `Slack thread reply sent via webhook channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
+      );
     };
 
     try {
       await reply('_Generating proposal…_');
       const { proposal } = await this.proposalService.generateForUpworkJob(row.upworkJobId);
+      this.logger.log(
+        `Slack proposal generated for job ${row.upworkJobId}; length=${proposal.length}.`,
+      );
       const parts = chunkForSlack(proposal);
       for (let i = 0; i < parts.length; i += 1) {
         const prefix =
@@ -337,6 +391,9 @@ export class SlackUpworkThreadService {
             : '*Proposal*\n\n';
         await reply(`${prefix}${parts[i]}`);
       }
+      this.logger.log(
+        `Slack proposal posted in ${parts.length} message part(s) for job ${row.upworkJobId}.`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Proposal generation for Slack thread failed: ${msg}`);
