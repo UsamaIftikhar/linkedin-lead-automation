@@ -10,6 +10,7 @@ import { buildSingleJobSlackBlocks } from './slack-upwork-job-blocks';
 const SLACK_POST_URL = 'https://slack.com/api/chat.postMessage';
 const MAX_SLACK_TEXT = 3900;
 const MAX_JOBS_PER_NOTIFY = 12;
+const SLACK_NOTIFY_TIMEOUT_MS = 7_000;
 
 /** Subtypes we should not treat as a user typing in a thread. */
 const SKIP_MESSAGE_SUBTYPES = new Set([
@@ -91,11 +92,10 @@ export class SlackUpworkThreadService {
       .sort((a, b) => b.priority.score - a.priority.score)
       .slice(0, MAX_JOBS_PER_NOTIFY);
 
-    let failures = 0;
-    for (const job of sorted) {
+    const results = await Promise.allSettled(
+      sorted.map(async (job) => {
       const blocks = buildSingleJobSlackBlocks(job);
       const textFallback = `${job.title} · score ${job.priority.score}`;
-      try {
         const res = await axios.post(
           webhookUrl,
           {
@@ -104,7 +104,7 @@ export class SlackUpworkThreadService {
           },
           {
             headers: { 'Content-Type': 'application/json' },
-            timeout: 20_000,
+            timeout: SLACK_NOTIFY_TIMEOUT_MS,
           },
         );
         const raw = res.data;
@@ -112,8 +112,7 @@ export class SlackUpworkThreadService {
           this.logger.warn(
             `Slack webhook returned non-JSON body (no ts) — use an app-based Incoming Webhook and set SLACK_UPWORK_CHANNEL_ID (${job.sourceJobId})`,
           );
-          failures += 1;
-          continue;
+          throw new Error('Slack webhook returned non-JSON body');
         }
         const data = raw as {
           channel?: string;
@@ -122,15 +121,13 @@ export class SlackUpworkThreadService {
           ts?: string;
         };
         if (data == null) {
-          failures += 1;
-          continue;
+          throw new Error('Slack webhook returned empty payload');
         }
         if (data.ok === false) {
           this.logger.warn(
             `Slack webhook rejected job post: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
           );
-          failures += 1;
-          continue;
+          throw new Error(data.error ?? 'Slack webhook rejected post');
         }
         const ts = data.ts;
         const channelId = data.channel?.trim() || channelFallback;
@@ -138,8 +135,7 @@ export class SlackUpworkThreadService {
           this.logger.warn(
             `Slack webhook did not return ts/channel — set SLACK_UPWORK_CHANNEL_ID and use a modern Incoming Webhook from an app (${job.sourceJobId})`,
           );
-          failures += 1;
-          continue;
+          throw new Error('Slack webhook did not return ts/channel');
         }
         if (job.jobId) {
           await this.prisma.slackUpworkJobMessage.create({
@@ -150,19 +146,28 @@ export class SlackUpworkThreadService {
             },
           });
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Slack webhook post exception (${job.sourceJobId}): ${msg}`);
-        failures += 1;
+      }),
+    );
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    for (const [idx, result] of results.entries()) {
+      if (result.status === 'rejected') {
+        const msg =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        this.logger.warn(
+          `Slack webhook post exception (${sorted[idx]?.sourceJobId ?? 'unknown'}): ${msg}`,
+        );
       }
     }
 
-    if (failures === sorted.length) {
+    if (failures.length === sorted.length) {
       return { detail: 'All per-job Slack webhook posts failed', ok: false, skipped: false };
     }
-    if (failures > 0) {
+    if (failures.length > 0) {
       return {
-        detail: `${failures} of ${sorted.length} webhook job posts failed (or missing ts)`,
+        detail: `${failures.length} of ${sorted.length} webhook job posts failed (or missing ts)`,
         ok: true,
         skipped: false,
       };
@@ -189,11 +194,10 @@ export class SlackUpworkThreadService {
       .sort((a, b) => b.priority.score - a.priority.score)
       .slice(0, MAX_JOBS_PER_NOTIFY);
 
-    let failures = 0;
-    for (const job of sorted) {
+    const results = await Promise.allSettled(
+      sorted.map(async (job) => {
       const blocks = buildSingleJobSlackBlocks(job);
       const textFallback = `${job.title} · score ${job.priority.score}`;
-      try {
         const res = await axios.post(
           SLACK_POST_URL,
           {
@@ -206,7 +210,7 @@ export class SlackUpworkThreadService {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json; charset=utf-8',
             },
-            timeout: 25_000,
+            timeout: SLACK_NOTIFY_TIMEOUT_MS,
           },
         );
         const data = res.data as { ok?: boolean; error?: string; ts?: string };
@@ -214,8 +218,7 @@ export class SlackUpworkThreadService {
           this.logger.warn(
             `Slack chat.postMessage failed: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
           );
-          failures += 1;
-          continue;
+          throw new Error(data.error ?? 'chat.postMessage failed');
         }
         if (job.jobId) {
           await this.prisma.slackUpworkJobMessage.create({
@@ -226,19 +229,28 @@ export class SlackUpworkThreadService {
             },
           });
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Slack post exception (${job.sourceJobId}): ${msg}`);
-        failures += 1;
+      }),
+    );
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    for (const [idx, result] of results.entries()) {
+      if (result.status === 'rejected') {
+        const msg =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        this.logger.warn(
+          `Slack post exception (${sorted[idx]?.sourceJobId ?? 'unknown'}): ${msg}`,
+        );
       }
     }
 
-    if (failures === sorted.length) {
+    if (failures.length === sorted.length) {
       return { detail: 'All Slack bot posts failed', ok: false, skipped: false };
     }
-    if (failures > 0) {
+    if (failures.length > 0) {
       return {
-        detail: `${failures} of ${sorted.length} Slack posts failed`,
+        detail: `${failures.length} of ${sorted.length} Slack posts failed`,
         ok: true,
         skipped: false,
       };

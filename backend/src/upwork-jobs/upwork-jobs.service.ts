@@ -346,7 +346,7 @@ export class UpworkJobsService {
           'x-rapidapi-key': apiKey,
         },
         params,
-        timeout: 45_000,
+        timeout: 15_000,
       });
     } catch (error) {
       this.logger.error(
