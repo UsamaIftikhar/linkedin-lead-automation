@@ -7,13 +7,13 @@
     },
     "backend": {
       "entrypoint": "backend",
-      "routePrefix": "/_/backend"
+      "routePrefix": "/backend"
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/_/backend/api/$1"
+      "dest": "/backend/api/$1"
     }
   ]
 }
