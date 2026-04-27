@@ -238,10 +238,7 @@ function tagsForWorkProject(projectName: string): string[] {
   return ['software', 'fullstack'];
 }
 
-function tagsFromSkillCategory(
-  category: string,
-  skills: string[],
-): string[] {
+function tagsFromSkillCategory(category: string, skills: string[]): string[] {
   const base = [category.replace(/_/g, '-')];
   const joined = skills.join(' ').toLowerCase();
   const tokens = joined.match(/[a-z][a-z0-9+#.]*/g) ?? [];

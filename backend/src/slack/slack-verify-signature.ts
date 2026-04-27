@@ -16,7 +16,9 @@ export function verifySlackSigningSecret(opts: {
     return false;
   }
   const basestring = `v0:${opts.requestTimestamp}:${opts.rawBody.toString('utf8')}`;
-  const hmac = createHmac('sha256', opts.signingSecret).update(basestring).digest('hex');
+  const hmac = createHmac('sha256', opts.signingSecret)
+    .update(basestring)
+    .digest('hex');
   const expected = `v0=${hmac}`;
   const a = Buffer.from(expected, 'utf8');
   const b = Buffer.from(opts.slackSignature, 'utf8');

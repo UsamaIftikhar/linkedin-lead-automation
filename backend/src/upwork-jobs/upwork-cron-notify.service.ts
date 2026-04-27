@@ -31,7 +31,9 @@ export class UpworkCronNotifyService {
       return { ok: true, skipped: true };
     }
 
-    const sorted = [...jobs].sort((a, b) => b.priority.score - a.priority.score);
+    const sorted = [...jobs].sort(
+      (a, b) => b.priority.score - a.priority.score,
+    );
 
     if (this.slackUpworkThread.isBotNotifyConfigured()) {
       const bot = await this.slackUpworkThread.notifyNewJobsViaBot(sorted);
@@ -64,17 +66,29 @@ export class UpworkCronNotifyService {
       return { ok: true, skipped: true };
     }
 
-    const sorted = [...jobs].sort((a, b) => b.priority.score - a.priority.score);
+    const sorted = [...jobs].sort(
+      (a, b) => b.priority.score - a.priority.score,
+    );
     const body = `Upwork — ${jobs.length} new job(s)\n\n${this.buildPlainDigest(sorted)}`;
 
-    const twilioSid = this.configService.get<string>('TWILIO_ACCOUNT_SID')?.trim();
-    const twilioToken = this.configService.get<string>('TWILIO_AUTH_TOKEN')?.trim();
-    const twilioFrom = this.configService.get<string>('TWILIO_WHATSAPP_FROM')?.trim();
-    const twilioTo = this.configService.get<string>('TWILIO_WHATSAPP_TO')?.trim();
+    const twilioSid = this.configService
+      .get<string>('TWILIO_ACCOUNT_SID')
+      ?.trim();
+    const twilioToken = this.configService
+      .get<string>('TWILIO_AUTH_TOKEN')
+      ?.trim();
+    const twilioFrom = this.configService
+      .get<string>('TWILIO_WHATSAPP_FROM')
+      ?.trim();
+    const twilioTo = this.configService
+      .get<string>('TWILIO_WHATSAPP_TO')
+      ?.trim();
 
     if (twilioSid && twilioToken && twilioFrom && twilioTo) {
       try {
-        const auth = Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
+        const auth = Buffer.from(`${twilioSid}:${twilioToken}`).toString(
+          'base64',
+        );
         const params = new URLSearchParams({
           Body: body.slice(0, 1600),
           From: twilioFrom,

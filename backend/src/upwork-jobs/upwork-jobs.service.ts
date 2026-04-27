@@ -19,6 +19,7 @@ import {
   formatPostedLine,
   scoreUpworkJobRecord,
 } from './upwork-job-score';
+import { calculateSemanticFit, detectProposalTemplate } from './job-fit.util';
 
 interface UpworkApiJob {
   job_id?: string;
@@ -207,20 +208,29 @@ export class UpworkJobsService {
           )
         : new Map<string, string>();
 
-    const newJobsForNotify: ScoredUpworkJobForNotify[] = newRecords.map(
-      (r) => ({
+    const newJobsForNotify: ScoredUpworkJobForNotify[] = newRecords.map((r) => {
+      const semantic = calculateSemanticFit(r.title, r.description);
+      const detectedTemplate = detectProposalTemplate(r.title, r.description);
+      const priority = scoreUpworkJobRecord(r);
+      return {
         budgetLine: formatBudgetLine(r),
         clientLine: formatClientLine(r),
-        jobId: idBySource.get(r.sourceJobId as string),
+        detectedTemplate: detectedTemplate.templateId,
+        detectedTemplateName: detectedTemplate.templateName,
+        disqualifiedBy: semantic.disqualifiedBy,
+        jobId: idBySource.get(r.sourceJobId),
         location: r.location ?? null,
+        matchedKeywords: semantic.matchedKeywords,
         postedLine: formatPostedLine(r),
-        priority: scoreUpworkJobRecord(r),
+        priority,
         proposalsDisplay: r.proposals?.trim() || 'n/a',
-        sourceJobId: r.sourceJobId as string,
-        title: r.title as string,
-        url: r.url as string,
-      }),
-    );
+        semanticFitScore: semantic.score,
+        sourceJobId: r.sourceJobId,
+        title: r.title,
+        urgency: priority.urgency,
+        url: r.url,
+      };
+    });
 
     const notifications =
       newJobsForNotify.length > 0
@@ -246,7 +256,9 @@ export class UpworkJobsService {
    * `X-Cron-Secret` header. If unset/empty, the cron URL is open (protect with network rules in production).
    */
   private assertCronSecret(provided: string): void {
-    const expected = this.configService.get<string>('UPWORK_CRON_SECRET')?.trim();
+    const expected = this.configService
+      .get<string>('UPWORK_CRON_SECRET')
+      ?.trim();
     if (!expected) {
       return;
     }
@@ -289,7 +301,8 @@ export class UpworkJobsService {
       next_cursor: query.next_cursor,
       q: query.q?.trim() || envStr('UPWORK_CRON_Q', 'JavaScript|React'),
       skills:
-        query.skills?.trim() || envStr('UPWORK_CRON_SKILLS', 'JavaScript|React'),
+        query.skills?.trim() ||
+        envStr('UPWORK_CRON_SKILLS', 'JavaScript|React'),
       skills_match_mode:
         query.skills_match_mode?.trim() ||
         envStr('UPWORK_CRON_SKILLS_MATCH_MODE', 'all'),
@@ -376,8 +389,9 @@ export class UpworkJobsService {
     };
   }
 
-  /** Jobs in India, with invites sent, or with 50+ proposals are not stored. */
+  /** Jobs in India, with invites sent, with 50+ proposals, or failing quality/fit filters are not stored. */
   private static shouldExcludeUpworkJob(job: UpworkApiJob): boolean {
+    const semantic = calculateSemanticFit(job.title, job.description);
     if (UpworkJobsService.locationIsIndia(job.location)) {
       return true;
     }
@@ -387,7 +401,51 @@ export class UpworkJobsService {
     if (UpworkJobsService.proposalsIndicateFiftyOrMore(job.proposals)) {
       return true;
     }
+    if (semantic.disqualified) {
+      return true;
+    }
+    if (UpworkJobsService.isBudgetTooLow(job)) {
+      return true;
+    }
+    if (UpworkJobsService.hasZeroClientHistory(job)) {
+      return true;
+    }
     return false;
+  }
+
+  private static isBudgetTooLow(job: UpworkApiJob): boolean {
+    const bt = job.budget_type?.trim().toLowerCase();
+    if (bt === 'fixed') {
+      const n = Number((job.budget_total_usd ?? '').replace(/[$,\s]/g, ''));
+      return Number.isFinite(n) ? n < 300 : false;
+    }
+    if (bt === 'hourly') {
+      const min =
+        typeof job.hourly_min_usd === 'number' ? job.hourly_min_usd : null;
+      const max =
+        typeof job.hourly_max_usd === 'number' ? job.hourly_max_usd : null;
+      if (min != null && max != null) {
+        return Math.max(min, max) < 15;
+      }
+      if (min != null) {
+        return min < 15;
+      }
+      if (max != null) {
+        return max < 15;
+      }
+    }
+    return false;
+  }
+
+  private static hasZeroClientHistory(job: UpworkApiJob): boolean {
+    const spentRaw = job.client_spent?.trim() ?? '';
+    const spent = spentRaw ? Number(spentRaw.replace(/[$,\s]/g, '')) : null;
+    const reviews =
+      typeof job.client_feedback_count === 'number'
+        ? job.client_feedback_count
+        : 0;
+    const hasZeroSpend = spent == null || (!Number.isNaN(spent) && spent <= 0);
+    return hasZeroSpend && reviews <= 0;
   }
 
   private static locationIsIndia(location: string | undefined): boolean {

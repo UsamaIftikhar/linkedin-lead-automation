@@ -33,15 +33,23 @@ export class SlackEventsController {
   ) {}
 
   @Post('events')
-  handleEvents(@Req() req: Request & { rawBody?: Buffer }): Record<string, unknown> {
-    const signingSecret = this.configService.get<string>('SLACK_SIGNING_SECRET')?.trim();
+  handleEvents(
+    @Req() req: Request & { rawBody?: Buffer },
+  ): Record<string, unknown> {
+    const signingSecret = this.configService
+      .get<string>('SLACK_SIGNING_SECRET')
+      ?.trim();
     if (!signingSecret) {
-      throw new ServiceUnavailableException('SLACK_SIGNING_SECRET is not configured.');
+      throw new ServiceUnavailableException(
+        'SLACK_SIGNING_SECRET is not configured.',
+      );
     }
 
     const rawBody = req.rawBody;
     if (!rawBody?.length) {
-      throw new BadRequestException('Missing raw body for Slack signature verification.');
+      throw new BadRequestException(
+        'Missing raw body for Slack signature verification.',
+      );
     }
 
     const ts = req.headers['x-slack-request-timestamp'];

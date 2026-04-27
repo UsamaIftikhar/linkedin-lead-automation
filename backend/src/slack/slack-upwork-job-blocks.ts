@@ -2,7 +2,11 @@ import type { ScoredUpworkJobForNotify } from '../upwork-jobs/scored-job-notify.
 import type { UpworkPriorityTier } from '../upwork-jobs/upwork-job-score';
 
 function escapeSlackLinkLabel(text: string): string {
-  return text.replace(/\|/g, '·').replace(/</g, '‹').replace(/>/g, '›').slice(0, 300);
+  return text
+    .replace(/\|/g, '·')
+    .replace(/</g, '‹')
+    .replace(/>/g, '›')
+    .slice(0, 300);
 }
 
 function postedDetail(postedLine: string): string {
@@ -23,7 +27,9 @@ function tierEmoji(tier: UpworkPriorityTier): string {
 }
 
 /** Shared mrkdwn for one job (each job = one Slack message). */
-export function formatUpworkJobMrkdwnSection(job: ScoredUpworkJobForNotify): string {
+export function formatUpworkJobMrkdwnSection(
+  job: ScoredUpworkJobForNotify,
+): string {
   const p = job.priority;
   const te = tierEmoji(p.tier);
   const link = `<${job.url}|${escapeSlackLinkLabel(job.title)}>`;
@@ -34,6 +40,9 @@ export function formatUpworkJobMrkdwnSection(job: ScoredUpworkJobForNotify): str
     `${te} *${p.label}* · Opportunity score *${p.score}*\n` +
     `📋 *Proposal guidance:* _${p.proposalHint}_\n\n` +
     `${link}\n\n` +
+    `🎯 Semantic fit: *${job.semanticFitScore}/100*` +
+    `${job.matchedKeywords.length ? ` · ${job.matchedKeywords.slice(0, 5).join(', ')}` : ''}\n` +
+    `🧩 Template: *${job.detectedTemplate}* (${job.detectedTemplateName}) · ⚡ ${job.urgency}\n` +
     `📍 ${loc} · 💰 ${job.budgetLine}\n` +
     `📊 Proposals: ${job.proposalsDisplay} · 🕐 ${posted}\n` +
     `👤 ${job.clientLine}\n\n` +

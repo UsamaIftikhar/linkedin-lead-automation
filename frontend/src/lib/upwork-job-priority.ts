@@ -1,5 +1,102 @@
 import type { UpworkJob } from '@/types/api';
 
+const PRIMARY_KEYWORDS = [
+  'ai assistant',
+  'ai chatbot',
+  'llm',
+  'openai',
+  'langchain',
+  'rag',
+  'retrieval augmented',
+  'saas',
+  'full stack',
+  'fullstack',
+  'react',
+  'next.js',
+  'nextjs',
+  'node.js',
+  'nodejs',
+  'ai agent',
+  'conversational ai',
+  'voice ai',
+  'elevenlabs',
+  'deepseek',
+  'mistral',
+  'vector database',
+  'ai integration',
+  'crm',
+  'dashboard',
+  'api integration',
+  'rest api',
+] as const;
+
+const SECONDARY_KEYWORDS = [
+  'typescript',
+  'nestjs',
+  'postgresql',
+  'mysql',
+  'redis',
+  'aws',
+  'docker',
+  'vercel',
+  'real-time',
+  'websocket',
+  'webhook',
+  'mobile app',
+  'react native',
+  'nuxt',
+  'vue',
+  'vuejs',
+  'express',
+  'mongodb',
+  'prisma',
+] as const;
+
+const DISQUALIFYING_KEYWORDS = [
+  'wordpress',
+  'shopify',
+  'woocommerce',
+  'php',
+  'laravel',
+  'flutter only',
+  'java only',
+  'python only',
+  'django only',
+  'ruby on rails',
+  'angular',
+  'svelte',
+  'blockchain',
+  'smart contract',
+  'solidity',
+  'web3',
+  'unity',
+  'game dev',
+  'devops only',
+  'data science',
+  'machine learning model training',
+  'ios swift',
+  'android kotlin',
+  'c#',
+  '.net',
+  'asp.net',
+] as const;
+
+function calculateSemanticFit(title: string, description: string) {
+  const text = `${title} ${description}`.toLowerCase();
+  const disqualifiedBy = DISQUALIFYING_KEYWORDS.filter((kw) => text.includes(kw));
+  if (disqualifiedBy.length > 0) {
+    return { disqualified: true, disqualifiedBy, score: 0 };
+  }
+  const matchedPrimary = PRIMARY_KEYWORDS.filter((kw) => text.includes(kw));
+  const matchedSecondary = SECONDARY_KEYWORDS.filter((kw) => text.includes(kw));
+  const rawScore = matchedPrimary.length * 3 + matchedSecondary.length;
+  return {
+    disqualified: false,
+    disqualifiedBy: [] as string[],
+    score: Math.min(100, Math.round((rawScore / 25) * 100)),
+  };
+}
+
 export type UpworkPriorityTier = 1 | 2 | 3 | 4;
 
 export type UpworkJobPriority = {
@@ -7,6 +104,7 @@ export type UpworkJobPriority = {
   reasons: string[];
   score: number;
   tier: UpworkPriorityTier;
+  urgency: 'HIGH' | 'MEDIUM' | 'SKIP' | 'URGENT';
 };
 
 const MS_HOUR = 60 * 60 * 1000;
@@ -218,21 +316,30 @@ export function scoreUpworkJob(job: UpworkJob): UpworkJobPriority {
   const prop = scoreProposalCompetition(job.proposals);
   const rec = scoreRecency(job.publishedAt);
   const cli = scoreClientQuality(job);
-
-  const score = prop + rec.points + cli.points;
+  const semantic = calculateSemanticFit(job.title, job.description);
+  const proposalCompetitionScore = Math.max(0, Math.min(100, (prop / 40) * 100));
+  const recencyScore = Math.max(0, Math.min(100, (rec.points / 35) * 100));
+  const clientQualityScore = Math.max(0, Math.min(100, (cli.points / 45) * 100));
+  const semanticFitScore = semantic.score;
+  const score = Math.round(
+    proposalCompetitionScore * 0.25 +
+      recencyScore * 0.2 +
+      clientQualityScore * 0.25 +
+      semanticFitScore * 0.3,
+  );
 
   let tier: UpworkPriorityTier = 4;
-  let label = 'Lower priority';
+  let label = 'Skip';
 
-  if (score >= 78) {
+  if (score >= 80) {
     tier = 1;
-    label = 'High potential';
-  } else if (score >= 58) {
+    label = 'Perfect Match';
+  } else if (score >= 65) {
     tier = 2;
-    label = 'Strong';
-  } else if (score >= 38) {
+    label = 'Strong Fit';
+  } else if (score >= 45) {
     tier = 3;
-    label = 'Worth a look';
+    label = 'Worth Applying';
   }
 
   const reasons: string[] = [];
@@ -250,12 +357,20 @@ export function scoreUpworkJob(job: UpworkJob): UpworkJobPriority {
   if (spent != null && spent >= 10_000) {
     reasons.push('High historical spend');
   }
+  if (semantic.disqualified) {
+    reasons.push(`Disqualifying keywords: ${semantic.disqualifiedBy.slice(0, 3).join(', ')}`);
+  } else if (semantic.score >= 70) {
+    reasons.push('Strong semantic match with target niche');
+  } else if (semantic.score >= 45) {
+    reasons.push('Moderate semantic alignment');
+  }
 
   return {
     label,
     reasons: reasons.length ? reasons : ['Review manually'],
-    score: Math.round(score * 10) / 10,
+    score,
     tier,
+    urgency: tier === 1 ? 'URGENT' : tier === 2 ? 'HIGH' : tier === 3 ? 'MEDIUM' : 'SKIP',
   };
 }
 

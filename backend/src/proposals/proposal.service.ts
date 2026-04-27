@@ -5,6 +5,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  detectProposalTemplate,
+  calculateSemanticFit,
+} from '../upwork-jobs/job-fit.util';
+import { formatBudgetLine } from '../upwork-jobs/upwork-job-score';
 import { RetrievalService } from './retrieval.service';
 import { buildPrompt } from './utils/prompt-builder';
 import { postProcessProposal } from './utils/post-process-proposal';
@@ -39,7 +44,9 @@ function buildJobDescriptionText(input: {
     budgetParts.push(`Budget type: ${input.budgetType}`);
   }
   if (input.hourlyMinUsd != null && input.hourlyMaxUsd != null) {
-    budgetParts.push(`Hourly: $${input.hourlyMinUsd}–$${input.hourlyMaxUsd}/hr`);
+    budgetParts.push(
+      `Hourly: $${input.hourlyMinUsd}–$${input.hourlyMaxUsd}/hr`,
+    );
   }
   if (input.budgetTotalUsd) {
     budgetParts.push(`Budget: ${input.budgetTotalUsd}`);
@@ -74,7 +81,10 @@ export class ProposalService {
     private readonly retrievalService: RetrievalService,
   ) {}
 
-  private async completeProposal(system: string, user: string): Promise<string> {
+  private async completeProposal(
+    system: string,
+    user: string,
+  ): Promise<string> {
     const apiKey = this.configService.get<string>('OPENROUTER_API_KEY')?.trim();
     if (!apiKey) {
       throw new ServiceUnavailableException(
@@ -123,7 +133,9 @@ export class ProposalService {
     const text =
       typeof raw === 'string' ? raw.trim() : String(raw ?? '').trim();
     if (!text) {
-      throw new ServiceUnavailableException('Model returned an empty proposal.');
+      throw new ServiceUnavailableException(
+        'Model returned an empty proposal.',
+      );
     }
 
     return text;
@@ -145,7 +157,19 @@ export class ProposalService {
     const jobDescription = buildJobDescriptionText(job);
     const { context, summaries } =
       await this.retrievalService.getRelevantContext(jobDescription);
-    const { system, user } = buildPrompt(jobDescription, context);
+    const detectedTemplate = detectProposalTemplate(job.title, job.description);
+    const semanticFit = calculateSemanticFit(job.title, job.description);
+    const { system, user } = buildPrompt({
+      context,
+      detectedTemplate,
+      job: {
+        budget: formatBudgetLine(job),
+        clientLocation: job.location ?? 'Not specified',
+        description: job.description,
+        title: job.title,
+      },
+      matchedKeywords: semanticFit.matchedKeywords,
+    });
     const rawProposal = await this.completeProposal(system, user);
     const proposal = postProcessProposal(rawProposal);
 

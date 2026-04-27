@@ -17,9 +17,10 @@ export class RetrievalService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      this.experienceEmbeddings = await this.embeddingService.warmExperienceEmbeddings(
-        RAG_EXPERIENCE_CHUNKS.map((e) => ({ content: e.content, id: e.id })),
-      );
+      this.experienceEmbeddings =
+        await this.embeddingService.warmExperienceEmbeddings(
+          RAG_EXPERIENCE_CHUNKS.map((e) => ({ content: e.content, id: e.id })),
+        );
       this.logger.log(
         `Warm-started ${this.experienceEmbeddings.size}/${RAG_EXPERIENCE_CHUNKS.length} profile RAG chunks`,
       );
@@ -35,10 +36,15 @@ export class RetrievalService implements OnModuleInit {
     const tagged = RAG_EXPERIENCE_CHUNKS.filter((item) =>
       item.tags.some((t) => keywords.has(t.toLowerCase())),
     );
-    return tagged.length >= MIN_TAG_FILTER ? tagged : [...RAG_EXPERIENCE_CHUNKS];
+    return tagged.length >= MIN_TAG_FILTER
+      ? tagged
+      : [...RAG_EXPERIENCE_CHUNKS];
   }
 
-  private rankByTagOverlap(jobText: string, pool: ExperienceItem[]): ExperienceItem[] {
+  private rankByTagOverlap(
+    jobText: string,
+    pool: ExperienceItem[],
+  ): ExperienceItem[] {
     const keywords = extractKeywords(jobText);
     return [...pool].sort((a, b) => {
       const score = (it: ExperienceItem) =>
@@ -81,8 +87,7 @@ export class RetrievalService implements OnModuleInit {
 
     const top = ordered.slice(0, TOP_K);
     const lines = top.map(
-      (e) =>
-        `- [${e.type}] ${e.content} (tags: ${e.tags.join(', ')})`,
+      (e) => `- [${e.type}] ${e.content} (tags: ${e.tags.join(', ')})`,
     );
 
     return {

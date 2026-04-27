@@ -73,7 +73,9 @@ export class SlackUpworkThreadService {
 
   isBotNotifyConfigured(): boolean {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
-    const channel = this.configService.get<string>('SLACK_UPWORK_CHANNEL_ID')?.trim();
+    const channel = this.configService
+      .get<string>('SLACK_UPWORK_CHANNEL_ID')
+      ?.trim();
     return Boolean(token && channel);
   }
 
@@ -93,65 +95,67 @@ export class SlackUpworkThreadService {
 
     const results = await Promise.allSettled(
       sorted.map(async (job) => {
-      const blocks = buildSingleJobSlackBlocks(job);
-      const textFallback = `${job.title} · score ${job.priority.score}`;
-      try {
-        const res = await axios.post(
-          webhookUrl,
-          {
-            blocks,
-            text: textFallback.slice(0, 500),
-          },
-          {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 20_000,
-          },
-        );
-        const raw = res.data;
-        if (typeof raw === 'string') {
-          this.logger.warn(
-            `Slack webhook returned non-JSON body (no ts) — use an app-based Incoming Webhook and set SLACK_UPWORK_CHANNEL_ID (${job.sourceJobId})`,
-          );
-          return false;
-        }
-        const data = raw as {
-          channel?: string;
-          error?: string;
-          ok?: boolean;
-          ts?: string;
-        };
-        if (data == null) {
-          return false;
-        }
-        if (data.ok === false) {
-          this.logger.warn(
-            `Slack webhook rejected job post: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
-          );
-          return false;
-        }
-        const ts = data.ts;
-        const channelId = data.channel?.trim() || channelFallback;
-        if (!ts || !channelId) {
-          this.logger.warn(
-            `Slack webhook did not return ts/channel — set SLACK_UPWORK_CHANNEL_ID and use a modern Incoming Webhook from an app (${job.sourceJobId})`,
-          );
-          return false;
-        }
-        if (job.jobId) {
-          await this.prisma.slackUpworkJobMessage.create({
-            data: {
-              channelId,
-              messageTs: ts,
-              upworkJobId: job.jobId,
+        const blocks = buildSingleJobSlackBlocks(job);
+        const textFallback = `${job.title} · score ${job.priority.score}`;
+        try {
+          const res = await axios.post<unknown>(
+            webhookUrl,
+            {
+              blocks,
+              text: textFallback.slice(0, 500),
             },
-          });
+            {
+              headers: { 'Content-Type': 'application/json' },
+              timeout: 20_000,
+            },
+          );
+          const raw: unknown = res.data;
+          if (typeof raw === 'string') {
+            this.logger.warn(
+              `Slack webhook returned non-JSON body (no ts) — use an app-based Incoming Webhook and set SLACK_UPWORK_CHANNEL_ID (${job.sourceJobId})`,
+            );
+            return false;
+          }
+          const data = raw as {
+            channel?: string;
+            error?: string;
+            ok?: boolean;
+            ts?: string;
+          };
+          if (data == null) {
+            return false;
+          }
+          if (data.ok === false) {
+            this.logger.warn(
+              `Slack webhook rejected job post: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
+            );
+            return false;
+          }
+          const ts = data.ts;
+          const channelId = data.channel?.trim() || channelFallback;
+          if (!ts || !channelId) {
+            this.logger.warn(
+              `Slack webhook did not return ts/channel — set SLACK_UPWORK_CHANNEL_ID and use a modern Incoming Webhook from an app (${job.sourceJobId})`,
+            );
+            return false;
+          }
+          if (job.jobId) {
+            await this.prisma.slackUpworkJobMessage.create({
+              data: {
+                channelId,
+                messageTs: ts,
+                upworkJobId: job.jobId,
+              },
+            });
+          }
+          return true;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Slack webhook post exception (${job.sourceJobId}): ${msg}`,
+          );
+          return false;
         }
-        return true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Slack webhook post exception (${job.sourceJobId}): ${msg}`);
-        return false;
-      }
       }),
     );
 
@@ -160,7 +164,11 @@ export class SlackUpworkThreadService {
     ).length;
 
     if (failures === sorted.length) {
-      return { detail: 'All per-job Slack webhook posts failed', ok: false, skipped: false };
+      return {
+        detail: 'All per-job Slack webhook posts failed',
+        ok: false,
+        skipped: false,
+      };
     }
     if (failures > 0) {
       return {
@@ -179,9 +187,15 @@ export class SlackUpworkThreadService {
     jobs: ScoredUpworkJobForNotify[],
   ): Promise<{ detail?: string; ok: boolean; skipped: boolean }> {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
-    const channel = this.configService.get<string>('SLACK_UPWORK_CHANNEL_ID')?.trim();
+    const channel = this.configService
+      .get<string>('SLACK_UPWORK_CHANNEL_ID')
+      ?.trim();
     if (!token || !channel) {
-      return { detail: 'SLACK_BOT_TOKEN or SLACK_UPWORK_CHANNEL_ID unset', ok: false, skipped: true };
+      return {
+        detail: 'SLACK_BOT_TOKEN or SLACK_UPWORK_CHANNEL_ID unset',
+        ok: false,
+        skipped: true,
+      };
     }
     if (!jobs.length) {
       return { ok: true, skipped: true };
@@ -193,46 +207,50 @@ export class SlackUpworkThreadService {
 
     const results = await Promise.allSettled(
       sorted.map(async (job) => {
-      const blocks = buildSingleJobSlackBlocks(job);
-      const textFallback = `${job.title} · score ${job.priority.score}`;
-      try {
-        const res = await axios.post(
-          SLACK_POST_URL,
-          {
-            blocks,
-            channel,
-            text: textFallback.slice(0, 500),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json; charset=utf-8',
+        const blocks = buildSingleJobSlackBlocks(job);
+        const textFallback = `${job.title} · score ${job.priority.score}`;
+        try {
+          const res = await axios.post(
+            SLACK_POST_URL,
+            {
+              blocks,
+              channel,
+              text: textFallback.slice(0, 500),
             },
-            timeout: 25_000,
-          },
-        );
-        const data = res.data as { ok?: boolean; error?: string; ts?: string };
-        if (!data.ok || !data.ts) {
-          this.logger.warn(
-            `Slack chat.postMessage failed: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              timeout: 25_000,
+            },
           );
+          const data = res.data as {
+            ok?: boolean;
+            error?: string;
+            ts?: string;
+          };
+          if (!data.ok || !data.ts) {
+            this.logger.warn(
+              `Slack chat.postMessage failed: ${data.error ?? 'unknown'} (${job.sourceJobId})`,
+            );
+            return false;
+          }
+          if (job.jobId) {
+            await this.prisma.slackUpworkJobMessage.create({
+              data: {
+                channelId: channel,
+                messageTs: data.ts,
+                upworkJobId: job.jobId,
+              },
+            });
+          }
+          return true;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Slack post exception (${job.sourceJobId}): ${msg}`);
           return false;
         }
-        if (job.jobId) {
-          await this.prisma.slackUpworkJobMessage.create({
-            data: {
-              channelId: channel,
-              messageTs: data.ts,
-              upworkJobId: job.jobId,
-            },
-          });
-        }
-        return true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Slack post exception (${job.sourceJobId}): ${msg}`);
-        return false;
-      }
       }),
     );
 
@@ -241,7 +259,11 @@ export class SlackUpworkThreadService {
     ).length;
 
     if (failures === sorted.length) {
-      return { detail: 'All Slack bot posts failed', ok: false, skipped: false };
+      return {
+        detail: 'All Slack bot posts failed',
+        ok: false,
+        skipped: false,
+      };
     }
     if (failures > 0) {
       return {
@@ -255,7 +277,9 @@ export class SlackUpworkThreadService {
 
   async handleThreadGenerateCommand(ev: SlackMessageEvent): Promise<void> {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
-    const webhookUrl = this.configService.get<string>('SLACK_WEBHOOK_URL')?.trim();
+    const webhookUrl = this.configService
+      .get<string>('SLACK_WEBHOOK_URL')
+      ?.trim();
     this.logger.log(
       `Slack thread command received channel=${ev.channel ?? 'unknown'} thread_ts=${ev.thread_ts ?? 'none'} ts=${ev.ts ?? 'none'} subtype=${ev.subtype ?? 'none'} bot=${ev.bot_id ? 'yes' : 'no'} text="${(ev.text ?? '').slice(0, 120)}"`,
     );
@@ -266,7 +290,9 @@ export class SlackUpworkThreadService {
       return;
     }
     if (ev.bot_id) {
-      this.logger.log('Slack thread command ignored because the event came from a bot.');
+      this.logger.log(
+        'Slack thread command ignored because the event came from a bot.',
+      );
       return;
     }
     if (ev.subtype && SKIP_MESSAGE_SUBTYPES.has(ev.subtype)) {
@@ -282,7 +308,9 @@ export class SlackUpworkThreadService {
       return;
     }
     if (ev.thread_ts === ev.ts) {
-      this.logger.log('Slack thread command ignored because it is the parent message, not a reply.');
+      this.logger.log(
+        'Slack thread command ignored because it is the parent message, not a reply.',
+      );
       return;
     }
     const text = ev.text?.trim() ?? '';
@@ -368,7 +396,9 @@ export class SlackUpworkThreadService {
       );
       if (typeof res.data === 'string') {
         if (!res.data.toLowerCase().includes('ok')) {
-          throw new Error(`incoming webhook reply failed: ${res.data.slice(0, 200)}`);
+          throw new Error(
+            `incoming webhook reply failed: ${res.data.slice(0, 200)}`,
+          );
         }
         this.logger.log(
           `Slack thread reply sent via webhook channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
@@ -386,7 +416,9 @@ export class SlackUpworkThreadService {
 
     try {
       await reply('_Generating proposal…_');
-      const { proposal } = await this.proposalService.generateForUpworkJob(row.upworkJobId);
+      const { proposal } = await this.proposalService.generateForUpworkJob(
+        row.upworkJobId,
+      );
       this.logger.log(
         `Slack proposal generated for job ${row.upworkJobId}; length=${proposal.length}.`,
       );

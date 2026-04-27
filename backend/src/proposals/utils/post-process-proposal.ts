@@ -9,6 +9,10 @@ export function postProcessProposal(text: string): string {
     /\bI believe I'm a great fit\b[^.!?]*[.!?]?\s*/gi,
     /\bI am a great fit\b[^.!?]*[.!?]?\s*/gi,
     /\bI'm a great fit\b[^.!?]*[.!?]?\s*/gi,
+    /\bLooking forward to hearing from you\b[^.!?]*[.!?]?\s*/gi,
+    /\bI look forward to hearing from you\b[^.!?]*[.!?]?\s*/gi,
+    /\bHope to hear from you\b[^.!?]*[.!?]?\s*/gi,
+    /\bI hope to hear from you\b[^.!?]*[.!?]?\s*/gi,
   ];
   for (const re of patterns) {
     out = out.replace(re, '');

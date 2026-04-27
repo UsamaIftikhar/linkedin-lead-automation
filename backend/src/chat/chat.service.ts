@@ -100,7 +100,9 @@ export class ChatService {
     const message = data.choices?.[0]?.message;
     const rawContent = message?.content;
     const content =
-      typeof rawContent === 'string' ? rawContent.trim() : String(rawContent ?? '').trim();
+      typeof rawContent === 'string'
+        ? rawContent.trim()
+        : String(rawContent ?? '').trim();
     const reasoning_details = message?.reasoning_details;
 
     if (!content && reasoning_details == null) {

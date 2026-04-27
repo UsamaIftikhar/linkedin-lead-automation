@@ -1,3 +1,5 @@
+import { calculateSemanticFit } from './job-fit.util';
+
 /**
  * Mirrors frontend `upwork-job-priority.ts` so cron/Slack use the same opportunity score.
  */
@@ -5,6 +7,7 @@
 export type UpworkPriorityTier = 1 | 2 | 3 | 4;
 
 export type UpworkJobScoreInput = {
+  description?: string | null;
   budgetTotalUsd?: string | null;
   budgetType?: string | null;
   clientFeedbackCount?: number | null;
@@ -17,6 +20,7 @@ export type UpworkJobScoreInput = {
   premium?: boolean | null;
   proposals?: string | null;
   publishedAt?: Date | string | null;
+  title?: string | null;
 };
 
 export type UpworkJobPriority = {
@@ -25,21 +29,28 @@ export type UpworkJobPriority = {
   reasons: string[];
   score: number;
   tier: UpworkPriorityTier;
+  urgency: 'HIGH' | 'MEDIUM' | 'SKIP' | 'URGENT';
 };
 
 const MS_HOUR = 60 * 60 * 1000;
 
-function publishedToIso(publishedAt: Date | string | null | undefined): string | null {
+function publishedToIso(
+  publishedAt: Date | string | null | undefined,
+): string | null {
   if (publishedAt == null) {
     return null;
   }
   if (publishedAt instanceof Date) {
-    return Number.isNaN(publishedAt.getTime()) ? null : publishedAt.toISOString();
+    return Number.isNaN(publishedAt.getTime())
+      ? null
+      : publishedAt.toISOString();
   }
   return publishedAt;
 }
 
-export function parseClientSpentUsd(raw: string | null | undefined): number | null {
+export function parseClientSpentUsd(
+  raw: string | null | undefined,
+): number | null {
   if (!raw?.trim()) {
     return null;
   }
@@ -47,7 +58,9 @@ export function parseClientSpentUsd(raw: string | null | undefined): number | nu
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-export function scoreProposalCompetition(proposals: string | null | undefined): number {
+export function scoreProposalCompetition(
+  proposals: string | null | undefined,
+): number {
   if (!proposals?.trim()) {
     return 10;
   }
@@ -156,7 +169,9 @@ export function scoreRecency(publishedAt: string | null): {
   return { hoursAgo, points: 0 };
 }
 
-function accountTenureYears(memberSince: string | null | undefined): number | null {
+function accountTenureYears(
+  memberSince: string | null | undefined,
+): number | null {
   if (!memberSince?.trim()) {
     return null;
   }
@@ -241,36 +256,73 @@ export function scoreClientQuality(job: UpworkJobScoreInput): {
 function proposalHintForTier(tier: UpworkPriorityTier): string {
   switch (tier) {
     case 1:
-      return 'Strong yes — prioritize a tailored proposal soon';
+      return 'Send immediately — high semantic fit + strong client. Use Template 1 or 2. Spend 10-12 connects.';
     case 2:
-      return 'Yes — good opportunity; send a solid custom proposal';
+      return 'Send within 2 hours — good fit, competitive window open. Use Template 2 or 3. Spend 8-10 connects.';
     case 3:
-      return 'Maybe — skim fit & client, then decide';
+      return 'Apply if you have connects to spare. Customize template carefully. Spend 6-8 connects.';
     default:
-      return 'Low priority — skip unless it is a perfect niche match';
+      return 'Not worth applying — low fit, high competition, or weak client.';
   }
 }
 
-export function scoreUpworkJobRecord(job: UpworkJobScoreInput): UpworkJobPriority {
+function urgencyForTier(
+  tier: UpworkPriorityTier,
+): UpworkJobPriority['urgency'] {
+  if (tier === 1) {
+    return 'URGENT';
+  }
+  if (tier === 2) {
+    return 'HIGH';
+  }
+  if (tier === 3) {
+    return 'MEDIUM';
+  }
+  return 'SKIP';
+}
+
+function normalize(value: number, max: number): number {
+  if (max <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, (value / max) * 100));
+}
+
+export function scoreUpworkJobRecord(
+  job: UpworkJobScoreInput,
+): UpworkJobPriority {
   const spent = parseClientSpentUsd(job.clientSpent ?? null);
   const prop = scoreProposalCompetition(job.proposals);
   const rec = scoreRecency(publishedToIso(job.publishedAt));
   const cli = scoreClientQuality(job);
+  const semantic = calculateSemanticFit(
+    job.title ?? null,
+    job.description ?? null,
+  );
 
-  const score = prop + rec.points + cli.points;
+  const proposalCompetitionScore = normalize(prop, 40);
+  const recencyScore = normalize(rec.points, 35);
+  const clientQualityScore = normalize(cli.points, 45);
+  const semanticFitScore = semantic.score;
+  const score = Math.round(
+    proposalCompetitionScore * 0.25 +
+      recencyScore * 0.2 +
+      clientQualityScore * 0.25 +
+      semanticFitScore * 0.3,
+  );
 
   let tier: UpworkPriorityTier = 4;
-  let label = 'Lower priority';
+  let label = 'Skip';
 
-  if (score >= 78) {
+  if (score >= 80) {
     tier = 1;
-    label = 'High potential';
-  } else if (score >= 58) {
+    label = 'Perfect Match';
+  } else if (score >= 65) {
     tier = 2;
-    label = 'Strong';
-  } else if (score >= 38) {
+    label = 'Strong Fit';
+  } else if (score >= 45) {
     tier = 3;
-    label = 'Worth a look';
+    label = 'Worth Applying';
   }
 
   const reasons: string[] = [];
@@ -288,13 +340,23 @@ export function scoreUpworkJobRecord(job: UpworkJobScoreInput): UpworkJobPriorit
   if (spent != null && spent >= 10_000) {
     reasons.push('High historical spend');
   }
+  if (semantic.disqualified) {
+    reasons.push(
+      `Disqualifying keywords: ${semantic.disqualifiedBy.slice(0, 3).join(', ')}`,
+    );
+  } else if (semantic.score >= 70) {
+    reasons.push('Strong semantic match with target niche');
+  } else if (semantic.score >= 45) {
+    reasons.push('Moderate semantic alignment');
+  }
 
   return {
     label,
     proposalHint: proposalHintForTier(tier),
     reasons: reasons.length ? reasons : ['Review manually'],
-    score: Math.round(score * 10) / 10,
+    score,
     tier,
+    urgency: urgencyForTier(tier),
   };
 }
 

@@ -76,8 +76,14 @@ export function validateEnv(config: Record<string, unknown>) {
       config,
       'UPWORK_CRON_SKILLS_MATCH_MODE',
     ),
-    UPWORK_CRON_HOURLY_MIN_USD: readString(config, 'UPWORK_CRON_HOURLY_MIN_USD'),
-    UPWORK_CRON_HOURLY_MAX_USD: readString(config, 'UPWORK_CRON_HOURLY_MAX_USD'),
+    UPWORK_CRON_HOURLY_MIN_USD: readString(
+      config,
+      'UPWORK_CRON_HOURLY_MIN_USD',
+    ),
+    UPWORK_CRON_HOURLY_MAX_USD: readString(
+      config,
+      'UPWORK_CRON_HOURLY_MAX_USD',
+    ),
     UPWORK_CRON_FIXED_MIN_USD: readString(config, 'UPWORK_CRON_FIXED_MIN_USD'),
     UPWORK_CRON_FIXED_MAX_USD: readString(config, 'UPWORK_CRON_FIXED_MAX_USD'),
     UPWORK_CRON_LIMIT: readString(config, 'UPWORK_CRON_LIMIT'),
@@ -90,10 +96,7 @@ export function validateEnv(config: Record<string, unknown>) {
     TWILIO_WHATSAPP_FROM: readString(config, 'TWILIO_WHATSAPP_FROM'),
     TWILIO_WHATSAPP_TO: readString(config, 'TWILIO_WHATSAPP_TO'),
     WHATSAPP_CALLMEBOT_PHONE: readString(config, 'WHATSAPP_CALLMEBOT_PHONE'),
-    WHATSAPP_CALLMEBOT_APIKEY: readString(
-      config,
-      'WHATSAPP_CALLMEBOT_APIKEY',
-    ),
+    WHATSAPP_CALLMEBOT_APIKEY: readString(config, 'WHATSAPP_CALLMEBOT_APIKEY'),
     HUNTER_API_KEY: readString(config, 'HUNTER_API_KEY'),
     HUNTER_MIN_CONFIDENCE: readNumber(
       config,
@@ -129,8 +132,11 @@ export function validateEnv(config: Record<string, unknown>) {
       'qwen/qwen3.6-plus-preview:free',
     ),
     OPENROUTER_REASONING_ENABLED:
-      readString(config, 'OPENROUTER_REASONING_ENABLED', 'true').toLowerCase() !==
-      'false',
+      readString(
+        config,
+        'OPENROUTER_REASONING_ENABLED',
+        'true',
+      ).toLowerCase() !== 'false',
     OPENROUTER_EMBEDDING_MODEL: readString(
       config,
       'OPENROUTER_EMBEDDING_MODEL',
