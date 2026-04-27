@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { fetchUpworkJobs, getUpworkJobs } from '@/lib/api';
 import {
@@ -151,13 +151,15 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
   const [q, setQ] = useState('JavaScript|React');
   const [skills, setSkills] = useState('JavaScript|React');
   const [skillsMatchMode, setSkillsMatchMode] = useState('all');
-  const [hourlyMin, setHourlyMin] = useState(10);
+  const [hourlyMin, setHourlyMin] = useState(15);
   const [hourlyMax, setHourlyMax] = useState(30);
   const [fixedMin, setFixedMin] = useState(100);
   const [fixedMax, setFixedMax] = useState(10_000);
   const [limit, setLimit] = useState(20);
   const [nextCursor, setNextCursor] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [fetchSummary, setFetchSummary] = useState<string | null>(null);
+  const fetchSummaryRef = useRef<HTMLDivElement>(null);
   const [proposalJob, setProposalJob] = useState<UpworkJob | null>(null);
   const [viewSavedProposal, setViewSavedProposal] = useState<{
     body: string;
@@ -182,11 +184,11 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
         : '';
       const filterHint =
         result.excludedByFilter > 0
-          ? ` ${result.excludedByFilter} job(s) skipped (India location, invites sent, or 50+ proposals).`
+          ? ` ${result.excludedByFilter} job(s) skipped (same rules as cron: India, invites sent, 50+ proposals, disqualifying keywords, budget under $300 fixed / $15/hr, or client with no spend and no reviews).`
           : '';
-      onSaved?.(
-        `Upwork: saved ${result.inserted} new row(s) (${result.skipped} duplicates skipped; ${result.totalFromApi} from API).${filterHint}${cursorHint}`,
-      );
+      const summary = `Upwork: saved ${result.inserted} new row(s) (${result.skipped} duplicates skipped; ${result.totalFromApi} from API).${filterHint}${cursorHint}`;
+      setFetchSummary(summary);
+      onSaved?.(summary);
       if (result.nextCursor) {
         setNextCursor(result.nextCursor);
       }
@@ -217,6 +219,16 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
   }, [jobsData]);
 
   const jobCount = jobsData?.length ?? 0;
+
+  useEffect(() => {
+    if (!fetchSummary) {
+      return;
+    }
+    fetchSummaryRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  }, [fetchSummary]);
 
   const submitParams = (): FetchUpworkJobsParams => ({
     fixed_max_usd: fixedMax,
@@ -259,9 +271,10 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
             Fetches from the Upwork jobs API and inserts into{' '}
             <code className="rounded bg-slate-100 px-1 text-xs">upwork_jobs</code>.
-            Jobs are omitted (not saved) when the location lists India as a
-            country, when invites have been sent, or when the proposals bucket
-            indicates 50 or more applicants. Duplicate{' '}
+            Jobs are omitted (not saved) when the location lists India, invites
+            have been sent, proposals indicate 50+, disqualifying keywords match,
+            fixed budget is under $300 or hourly under $15, or the client has no
+            spend and no reviews. Duplicate{' '}
             <code className="rounded bg-slate-100 px-1 text-xs">job_id</code>s are
             skipped.
           </p>
@@ -272,6 +285,7 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
           onSubmit={(event) => {
             event.preventDefault();
             setLocalError(null);
+            setFetchSummary(null);
             void fetchMutation.mutateAsync(submitParams());
           }}
         >
@@ -396,6 +410,17 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
             </button>
           </div>
         </form>
+
+        {fetchSummary ? (
+          <div
+            ref={fetchSummaryRef}
+            aria-live="polite"
+            className="scroll-mt-4 mt-5 rounded-2xl border-2 border-emerald-400/90 bg-emerald-50 px-5 py-4 text-base font-medium leading-relaxed text-emerald-950 shadow-md ring-1 ring-emerald-200/70"
+            role="status"
+          >
+            {fetchSummary}
+          </div>
+        ) : null}
 
         {localError ? (
           <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

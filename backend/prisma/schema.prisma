@@ -61,6 +61,13 @@ model UpworkJob {
   openCount           Int?
   isContractToHire    Boolean?
   isEnterprise        Boolean?
+  semanticFitScore    Int?
+  matchedKeywords     String[]  @default([])
+  disqualified        Boolean   @default(false)
+  disqualifiedBy      String[]  @default([])
+  detectedTemplate    Int?
+  detectedTemplateName String?
+  urgency             String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -85,10 +92,13 @@ model SlackUpworkJobMessage {
 }
 
 model UpworkProposalDraft {
-  id          String   @id @default(uuid()) @db.Uuid
-  upworkJobId String   @map("upwork_job_id") @db.Uuid
-  body        String   @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
+  id                   String   @id @default(uuid()) @db.Uuid
+  upworkJobId          String   @map("upwork_job_id") @db.Uuid
+  body                 String   @db.Text
+  templateUsed         Int?     @map("template_used")
+  templateName         String?  @map("template_name")
+  connectsRecommended  Int?     @map("connects_recommended")
+  createdAt            DateTime @default(now()) @map("created_at")
 
   job UpworkJob @relation(fields: [upworkJobId], references: [id], onDelete: Cascade)
 

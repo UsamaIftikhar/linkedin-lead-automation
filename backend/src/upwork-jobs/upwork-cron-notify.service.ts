@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { SlackUpworkThreadService } from '../slack/slack-upwork-thread.service';
+import { connectsSpendHint } from './upwork-job-score';
 import type { ScoredUpworkJobForNotify } from './scored-job-notify.types';
 
 export type { ScoredUpworkJobForNotify } from './scored-job-notify.types';
@@ -19,7 +20,15 @@ export class UpworkCronNotifyService {
     return jobs
       .map((j, i) => {
         const p = j.priority;
-        return `${i + 1}. [${p.label} · ${p.score}] ${j.title}\n   ${j.url}\n   Proposal: ${p.proposalHint}`;
+        const kw = j.matchedKeywords.slice(0, 5).join(', ');
+        return (
+          `${i + 1}. [${p.label} · score ${p.score}] ${j.title}\n` +
+          `   Semantic fit ${j.semanticFitScore}/100${kw ? ` — ${kw}` : ''}\n` +
+          `   Template ${j.detectedTemplate}: ${j.detectedTemplateName} · Urgency: ${j.urgency}\n` +
+          `   Connects: ${connectsSpendHint(p.tier)}\n` +
+          `   ${j.url}\n` +
+          `   Proposal: ${p.proposalHint}`
+        );
       })
       .join('\n\n');
   }

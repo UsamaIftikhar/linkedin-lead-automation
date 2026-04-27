@@ -32,6 +32,35 @@ export type UpworkJobPriority = {
   urgency: 'HIGH' | 'MEDIUM' | 'SKIP' | 'URGENT';
 };
 
+/** Midpoint of spec ranges: tier 1 → 10–12, tier 2 → 8–10, tier 3 → 6–8. */
+export function connectsRecommendedForTier(
+  tier: UpworkPriorityTier,
+): number | null {
+  if (tier === 1) {
+    return 11;
+  }
+  if (tier === 2) {
+    return 9;
+  }
+  if (tier === 3) {
+    return 7;
+  }
+  return null;
+}
+
+export function connectsSpendHint(tier: UpworkPriorityTier): string {
+  switch (tier) {
+    case 1:
+      return '10–12 connects';
+    case 2:
+      return '8–10 connects';
+    case 3:
+      return '6–8 connects';
+    default:
+      return 'Skip';
+  }
+}
+
 const MS_HOUR = 60 * 60 * 1000;
 
 function publishedToIso(
@@ -326,6 +355,16 @@ export function scoreUpworkJobRecord(
   }
 
   const reasons: string[] = [];
+  if (semantic.disqualified) {
+    reasons.push(
+      `Semantic fit 0/100 (disqualified: ${semantic.disqualifiedBy.slice(0, 5).join(', ')})`,
+    );
+  } else {
+    const kwPreview = semantic.matchedKeywords.slice(0, 8).join(', ');
+    reasons.push(
+      `Semantic fit ${semantic.score}/100${kwPreview ? ` — ${kwPreview}` : ''}`,
+    );
+  }
   if (prop >= 28) {
     reasons.push('Low proposal competition');
   }
@@ -340,14 +379,10 @@ export function scoreUpworkJobRecord(
   if (spent != null && spent >= 10_000) {
     reasons.push('High historical spend');
   }
-  if (semantic.disqualified) {
-    reasons.push(
-      `Disqualifying keywords: ${semantic.disqualifiedBy.slice(0, 3).join(', ')}`,
-    );
-  } else if (semantic.score >= 70) {
-    reasons.push('Strong semantic match with target niche');
-  } else if (semantic.score >= 45) {
-    reasons.push('Moderate semantic alignment');
+  if (!semantic.disqualified && semantic.score >= 70) {
+    reasons.push('Strong niche keyword coverage');
+  } else if (!semantic.disqualified && semantic.score >= 45) {
+    reasons.push('Moderate niche keyword coverage');
   }
 
   return {

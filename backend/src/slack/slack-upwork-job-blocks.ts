@@ -1,5 +1,8 @@
 import type { ScoredUpworkJobForNotify } from '../upwork-jobs/scored-job-notify.types';
-import type { UpworkPriorityTier } from '../upwork-jobs/upwork-job-score';
+import {
+  connectsSpendHint,
+  type UpworkPriorityTier,
+} from '../upwork-jobs/upwork-job-score';
 
 function escapeSlackLinkLabel(text: string): string {
   return text
@@ -41,8 +44,10 @@ export function formatUpworkJobMrkdwnSection(
     `📋 *Proposal guidance:* _${p.proposalHint}_\n\n` +
     `${link}\n\n` +
     `🎯 Semantic fit: *${job.semanticFitScore}/100*` +
-    `${job.matchedKeywords.length ? ` · ${job.matchedKeywords.slice(0, 5).join(', ')}` : ''}\n` +
-    `🧩 Template: *${job.detectedTemplate}* (${job.detectedTemplateName}) · ⚡ ${job.urgency}\n` +
+    `${job.matchedKeywords.length ? ` — Keywords: ${job.matchedKeywords.slice(0, 5).join(', ')}` : ''}\n` +
+    `📋 Recommended template: *Template ${job.detectedTemplate}* (${job.detectedTemplateName})\n` +
+    `⚡ Urgency: *${job.urgency}*\n` +
+    `🔗 Connects to spend: *${connectsSpendHint(p.tier)}*\n` +
     `📍 ${loc} · 💰 ${job.budgetLine}\n` +
     `📊 Proposals: ${job.proposalsDisplay} · 🕐 ${posted}\n` +
     `👤 ${job.clientLine}\n\n` +

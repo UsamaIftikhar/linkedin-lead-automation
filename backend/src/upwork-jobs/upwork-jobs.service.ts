@@ -13,6 +13,7 @@ import { FetchUpworkJobsQueryDto } from './dto/fetch-upwork-jobs-query.dto';
 import type { UpworkCronFetchQueryDto } from './dto/upwork-cron-fetch-query.dto';
 import { UpworkCronNotifyService } from './upwork-cron-notify.service';
 import type { ScoredUpworkJobForNotify } from './scored-job-notify.types';
+import type { UpworkJobScoreInput } from './upwork-job-score';
 import {
   formatBudgetLine,
   formatClientLine,
@@ -77,7 +78,14 @@ export class UpworkJobsService {
         include: {
           proposalDrafts: {
             orderBy: { createdAt: 'desc' },
-            select: { body: true, createdAt: true, id: true },
+            select: {
+              body: true,
+              connectsRecommended: true,
+              createdAt: true,
+              id: true,
+              templateName: true,
+              templateUsed: true,
+            },
             take: 1,
           },
         },
@@ -296,7 +304,7 @@ export class UpworkJobsService {
         this.readCronNumber('UPWORK_CRON_HOURLY_MAX_USD', 30),
       hourly_min_usd:
         query.hourly_min_usd ??
-        this.readCronNumber('UPWORK_CRON_HOURLY_MIN_USD', 10),
+        this.readCronNumber('UPWORK_CRON_HOURLY_MIN_USD', 15),
       limit: query.limit ?? this.readCronNumber('UPWORK_CRON_LIMIT', 20),
       next_cursor: query.next_cursor,
       q: query.q?.trim() || envStr('UPWORK_CRON_Q', 'JavaScript|React'),
@@ -329,7 +337,7 @@ export class UpworkJobsService {
     const q = query.q?.trim() || 'JavaScript|React';
     const skills = query.skills?.trim() || 'JavaScript|React';
     const skills_match_mode = query.skills_match_mode?.trim() || 'all';
-    const hourly_min_usd = query.hourly_min_usd ?? 10;
+    const hourly_min_usd = query.hourly_min_usd ?? 15;
     const hourly_max_usd = query.hourly_max_usd ?? 30;
     const fixed_min_usd = query.fixed_min_usd ?? 100;
     const fixed_max_usd = query.fixed_max_usd ?? 10_000;
@@ -558,16 +566,9 @@ export class UpworkJobsService {
       }
     }
 
-    return {
+    const scoreInput: UpworkJobScoreInput = {
       budgetTotalUsd: job.budget_total_usd?.trim() || null,
       budgetType,
-      categoryGroupName: job.category_group_name?.trim() || null,
-      categoryName: job.category_name?.trim() || null,
-      clientActiveHires:
-        typeof job.client_active_hires === 'number'
-          ? job.client_active_hires
-          : null,
-      clientCompanySize: job.client_company_size?.trim() || null,
       clientFeedbackCount:
         typeof job.client_feedback_count === 'number'
           ? job.client_feedback_count
@@ -576,15 +577,50 @@ export class UpworkJobsService {
       clientScore:
         typeof job.client_score === 'number' ? job.client_score : null,
       clientSpent: job.client_spent?.trim() || null,
+      description,
+      hourlyMaxUsd,
+      hourlyMinUsd,
+      hoursPerWeek: job.hours_per_week?.trim() || null,
+      premium: Boolean(job.premium),
+      proposals: job.proposals?.trim() || null,
+      publishedAt:
+        publishedAt && !Number.isNaN(publishedAt.getTime())
+          ? publishedAt
+          : null,
+      title,
+    };
+
+    const semantic = calculateSemanticFit(title, description);
+    const detected = detectProposalTemplate(title, description);
+    const priority = scoreUpworkJobRecord(scoreInput);
+
+    return {
+      budgetTotalUsd: scoreInput.budgetTotalUsd,
+      budgetType,
+      categoryGroupName: job.category_group_name?.trim() || null,
+      categoryName: job.category_name?.trim() || null,
+      clientActiveHires:
+        typeof job.client_active_hires === 'number'
+          ? job.client_active_hires
+          : null,
+      clientCompanySize: job.client_company_size?.trim() || null,
+      clientFeedbackCount: scoreInput.clientFeedbackCount,
+      clientMemberSince: scoreInput.clientMemberSince,
+      clientScore: scoreInput.clientScore,
+      clientSpent: scoreInput.clientSpent,
       clientTotalHires:
         typeof job.client_total_hires === 'number'
           ? job.client_total_hires
           : null,
       description,
+      detectedTemplate: detected.templateId,
+      detectedTemplateName: detected.templateName,
+      disqualified: semantic.disqualified,
+      disqualifiedBy: semantic.disqualifiedBy,
       experienceLevel: job.experience_level?.trim() || null,
       hourlyMaxUsd,
       hourlyMinUsd,
-      hoursPerWeek: job.hours_per_week?.trim() || null,
+      hoursPerWeek: scoreInput.hoursPerWeek,
       invitesSent:
         job.invites_sent === undefined || job.invites_sent === null
           ? null
@@ -596,14 +632,13 @@ export class UpworkJobsService {
       isContractToHire: job.is_contract_to_hire ?? null,
       isEnterprise: job.is_enterprise ?? null,
       location: job.location?.trim() || null,
+      matchedKeywords: semantic.matchedKeywords,
       openCount: typeof job.open_count === 'number' ? job.open_count : null,
-      premium: Boolean(job.premium),
+      premium: scoreInput.premium ?? false,
       projectLength: job.project_length?.trim() || null,
-      proposals: job.proposals?.trim() || null,
-      publishedAt:
-        publishedAt && !Number.isNaN(publishedAt.getTime())
-          ? publishedAt
-          : null,
+      proposals: scoreInput.proposals,
+      publishedAt: scoreInput.publishedAt ?? null,
+      semanticFitScore: semantic.score,
       skills: skills ?? undefined,
       sourceJobId,
       title,
@@ -611,6 +646,7 @@ export class UpworkJobsService {
         typeof job.total_jobs_with_hires === 'number'
           ? job.total_jobs_with_hires
           : null,
+      urgency: priority.urgency,
       url,
     };
   }

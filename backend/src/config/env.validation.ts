@@ -87,6 +87,18 @@ export function validateEnv(config: Record<string, unknown>) {
     UPWORK_CRON_FIXED_MIN_USD: readString(config, 'UPWORK_CRON_FIXED_MIN_USD'),
     UPWORK_CRON_FIXED_MAX_USD: readString(config, 'UPWORK_CRON_FIXED_MAX_USD'),
     UPWORK_CRON_LIMIT: readString(config, 'UPWORK_CRON_LIMIT'),
+    UPWORK_DAILY_SUMMARY_ENABLED: readString(
+      config,
+      'UPWORK_DAILY_SUMMARY_ENABLED',
+    ),
+    UPWORK_CONNECTS_USED_TODAY: readString(
+      config,
+      'UPWORK_CONNECTS_USED_TODAY',
+    ),
+    UPWORK_CONNECTS_REMAINING: readString(
+      config,
+      'UPWORK_CONNECTS_REMAINING',
+    ),
     SLACK_WEBHOOK_URL: readString(config, 'SLACK_WEBHOOK_URL'),
     SLACK_BOT_TOKEN: readString(config, 'SLACK_BOT_TOKEN'),
     SLACK_SIGNING_SECRET: readString(config, 'SLACK_SIGNING_SECRET'),
@@ -142,6 +154,10 @@ export function validateEnv(config: Record<string, unknown>) {
       'OPENROUTER_EMBEDDING_MODEL',
       'openai/text-embedding-3-small',
     ),
-    OPENROUTER_PROPOSAL_MODEL: readString(config, 'OPENROUTER_PROPOSAL_MODEL'),
+    OPENROUTER_PROPOSAL_MODEL: readString(
+      config,
+      'OPENROUTER_PROPOSAL_MODEL',
+      'deepseek/deepseek-v4-flash',
+    ),
   };
 }

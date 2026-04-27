@@ -85,7 +85,12 @@ function calculateSemanticFit(title: string, description: string) {
   const text = `${title} ${description}`.toLowerCase();
   const disqualifiedBy = DISQUALIFYING_KEYWORDS.filter((kw) => text.includes(kw));
   if (disqualifiedBy.length > 0) {
-    return { disqualified: true, disqualifiedBy, score: 0 };
+    return {
+      disqualified: true,
+      disqualifiedBy,
+      matchedKeywords: [] as string[],
+      score: 0,
+    };
   }
   const matchedPrimary = PRIMARY_KEYWORDS.filter((kw) => text.includes(kw));
   const matchedSecondary = SECONDARY_KEYWORDS.filter((kw) => text.includes(kw));
@@ -93,6 +98,7 @@ function calculateSemanticFit(title: string, description: string) {
   return {
     disqualified: false,
     disqualifiedBy: [] as string[],
+    matchedKeywords: [...matchedPrimary, ...matchedSecondary],
     score: Math.min(100, Math.round((rawScore / 25) * 100)),
   };
 }
@@ -343,6 +349,16 @@ export function scoreUpworkJob(job: UpworkJob): UpworkJobPriority {
   }
 
   const reasons: string[] = [];
+  if (semantic.disqualified) {
+    reasons.push(
+      `Semantic fit 0/100 (disqualified: ${semantic.disqualifiedBy.slice(0, 5).join(', ')})`,
+    );
+  } else {
+    const kwPreview = semantic.matchedKeywords.slice(0, 8).join(', ');
+    reasons.push(
+      `Semantic fit ${semantic.score}/100${kwPreview ? ` — ${kwPreview}` : ''}`,
+    );
+  }
   if (prop >= 28) {
     reasons.push('Low proposal competition');
   }
@@ -357,12 +373,10 @@ export function scoreUpworkJob(job: UpworkJob): UpworkJobPriority {
   if (spent != null && spent >= 10_000) {
     reasons.push('High historical spend');
   }
-  if (semantic.disqualified) {
-    reasons.push(`Disqualifying keywords: ${semantic.disqualifiedBy.slice(0, 3).join(', ')}`);
-  } else if (semantic.score >= 70) {
-    reasons.push('Strong semantic match with target niche');
-  } else if (semantic.score >= 45) {
-    reasons.push('Moderate semantic alignment');
+  if (!semantic.disqualified && semantic.score >= 70) {
+    reasons.push('Strong niche keyword coverage');
+  } else if (!semantic.disqualified && semantic.score >= 45) {
+    reasons.push('Moderate niche keyword coverage');
   }
 
   return {

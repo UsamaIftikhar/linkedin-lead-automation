@@ -84,8 +84,11 @@ export interface SendOneEmailResponse {
 
 export interface UpworkProposalSummary {
   body: string;
+  connectsRecommended?: number | null;
   createdAt: string;
   id: string;
+  templateName?: string | null;
+  templateUsed?: number | null;
 }
 
 export interface UpworkJob {
@@ -121,6 +124,14 @@ export interface UpworkJob {
   openCount: number | null;
   isContractToHire: boolean | null;
   isEnterprise: boolean | null;
+  /** Populated for jobs ingested after semantic-fit rollout (optional on older rows). */
+  semanticFitScore?: number | null;
+  matchedKeywords?: string[];
+  disqualified?: boolean;
+  disqualifiedBy?: string[];
+  detectedTemplate?: number | null;
+  detectedTemplateName?: string | null;
+  urgency?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Latest saved draft from proposal generator, if any. */
@@ -148,7 +159,9 @@ export interface FetchUpworkJobsResult {
 }
 
 export interface GenerateUpworkProposalResponse {
+  draftId: string;
+  /** OpenRouter model id used for `POST .../chat/completions`. */
+  openRouterModel: string;
   proposal: string;
   retrievedSummaries: string[];
-  draftId: string;
 }

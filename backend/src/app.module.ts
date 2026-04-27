@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { validateEnv } from './config/env.validation';
 import { EmailsModule } from './emails/emails.module';
@@ -18,6 +19,7 @@ import { ProposalsModule } from './proposals/proposals.module';
       isGlobal: true,
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     LeadsModule,
     JobsModule,

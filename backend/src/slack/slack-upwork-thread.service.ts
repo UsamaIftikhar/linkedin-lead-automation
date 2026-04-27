@@ -439,4 +439,69 @@ export class SlackUpworkThreadService {
       await reply(`Could not generate a proposal: ${msg.slice(0, 500)}`);
     }
   }
+
+  /**
+   * Post a plain-text message to the configured Upwork Slack channel (e.g. daily digest).
+   */
+  async postPlainTextToUpworkChannel(
+    text: string,
+  ): Promise<{ detail?: string; ok: boolean }> {
+    const truncated = text.slice(0, 39_000);
+    const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
+    const channel = this.configService
+      .get<string>('SLACK_UPWORK_CHANNEL_ID')
+      ?.trim();
+    if (token && channel) {
+      try {
+        const res = await axios.post(
+          SLACK_POST_URL,
+          {
+            channel,
+            text: truncated,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            timeout: 25_000,
+          },
+        );
+        const data = res.data as { error?: string; ok?: boolean };
+        if (!data.ok) {
+          return {
+            detail: data.error ?? 'chat.postMessage failed',
+            ok: false,
+          };
+        }
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { detail: msg, ok: false };
+      }
+    }
+    const webhookUrl = this.configService
+      .get<string>('SLACK_WEBHOOK_URL')
+      ?.trim();
+    if (webhookUrl) {
+      try {
+        await axios.post(
+          webhookUrl,
+          { text: truncated },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 20_000,
+          },
+        );
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { detail: msg, ok: false };
+      }
+    }
+    return {
+      detail: 'No SLACK_BOT_TOKEN + SLACK_UPWORK_CHANNEL_ID or SLACK_WEBHOOK_URL',
+      ok: false,
+    };
+  }
 }
