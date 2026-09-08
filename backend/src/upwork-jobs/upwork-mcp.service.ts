@@ -553,9 +553,12 @@ export class UpworkMcpService {
         );
       }
       return {
-        action: 'search',
+        action: 'smart_search',
         org_uid: organizationUid,
-        params: this.buildOfficialSearchParams(query),
+        params: {
+          ...this.buildOfficialSearchParams(query),
+          mode: 'most_recent',
+        },
       };
     }
 
