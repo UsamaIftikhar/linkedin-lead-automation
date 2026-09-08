@@ -406,7 +406,12 @@ export class UpworkMcpService {
 
   private createProvider(): OAuthClientProvider {
     const redirectUrl = this.redirectUri();
-    const applicationType = 'native';
+    const redirectHost = new URL(redirectUrl).hostname;
+    const applicationType = ['localhost', '127.0.0.1', '::1'].includes(
+      redirectHost,
+    )
+      ? 'native'
+      : 'web';
 
     return {
       redirectUrl,
