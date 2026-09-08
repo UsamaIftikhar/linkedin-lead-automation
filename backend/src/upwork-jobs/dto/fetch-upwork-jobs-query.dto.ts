@@ -75,4 +75,12 @@ export class FetchUpworkJobsQueryDto {
   @IsString()
   @MaxLength(2000)
   next_cursor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === '' ? undefined : Number(value),
+  )
+  @IsInt()
+  @Min(1)
+  days_posted?: number;
 }

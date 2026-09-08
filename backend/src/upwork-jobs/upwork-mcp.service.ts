@@ -668,31 +668,20 @@ export class UpworkMcpService {
     );
   }
 
+  /**
+   * smart_search is a personalized recommendation feed — it does not accept
+   * query/skills/rate/budget params (confirmed via the API's own skills_note;
+   * live testing showed passing skills collapses ~20-24 profile-matched
+   * results down to ~2). Skill/keyword and budget targeting are applied by
+   * our own post-fetch filter (see rejectionReason) instead.
+   */
   private buildOfficialSearchParams(
     query: FetchUpworkJobsQueryDto,
   ): JsonObject {
     const params: JsonObject = {};
-    const skills = (query.skills ?? '')
-      .split('|')
-      .map((value) => value.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-    const matchAny = query.skills_match_mode?.trim().toLowerCase() === 'any';
-    const queryParts = [query.q?.replaceAll('|', ' OR ')];
-
-    if (matchAny && skills.length) queryParts.push(skills.join(' OR '));
-    const searchText = queryParts.filter(Boolean).join(' ');
-    if (searchText) params.query = searchText;
-    if (!matchAny && skills.length) params.skills = skills;
-    if (query.hourly_min_usd !== undefined)
-      params.rate_min = query.hourly_min_usd;
-    if (query.hourly_max_usd !== undefined)
-      params.rate_max = query.hourly_max_usd;
-    if (query.fixed_min_usd !== undefined)
-      params.budget_min = query.fixed_min_usd;
-    if (query.fixed_max_usd !== undefined)
-      params.budget_max = query.fixed_max_usd;
     if (query.next_cursor) params.cursor = query.next_cursor;
+    params.days_posted = query.days_posted ?? 1;
+    params.verified_payment_only = true;
     params.limit = Math.min(query.limit ?? 10, 10);
 
     return params;

@@ -95,6 +95,7 @@ export function validateEnv(config: Record<string, unknown>) {
     UPWORK_CRON_FIXED_MIN_USD: readString(config, 'UPWORK_CRON_FIXED_MIN_USD'),
     UPWORK_CRON_FIXED_MAX_USD: readString(config, 'UPWORK_CRON_FIXED_MAX_USD'),
     UPWORK_CRON_LIMIT: readString(config, 'UPWORK_CRON_LIMIT'),
+    UPWORK_CRON_DAYS_POSTED: readString(config, 'UPWORK_CRON_DAYS_POSTED'),
     UPWORK_DAILY_SUMMARY_ENABLED: readString(
       config,
       'UPWORK_DAILY_SUMMARY_ENABLED',

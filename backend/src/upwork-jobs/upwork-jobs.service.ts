@@ -289,6 +289,8 @@ export class UpworkJobsService {
       this.configService.get<string>(key)?.trim() || fallback;
 
     return {
+      days_posted:
+        query.days_posted ?? this.readCronNumber('UPWORK_CRON_DAYS_POSTED', 1),
       fixed_max_usd:
         query.fixed_max_usd ??
         this.readCronNumber('UPWORK_CRON_FIXED_MAX_USD', 10_000),
@@ -379,7 +381,43 @@ export class UpworkJobsService {
     if (UpworkJobsService.hasZeroClientHistory(job)) {
       return 'no client spend or reviews';
     }
+    if (!UpworkJobsService.matchesKeywordTargeting(job, preferences)) {
+      return 'no skill/keyword match';
+    }
     return null;
+  }
+
+  /**
+   * smart_search does not accept query/skills params, so keyword/skill
+   * targeting from UPWORK_CRON_Q / UPWORK_CRON_SKILLS is applied here
+   * instead. OR match: keep the job if ANY target term appears in its
+   * title, description, or skills list. If no target terms are configured,
+   * nothing is filtered.
+   */
+  private static matchesKeywordTargeting(
+    job: UpworkApiJob,
+    preferences: FetchUpworkJobsQueryDto,
+  ): boolean {
+    const terms = [
+      ...(preferences.q ?? '').split('|'),
+      ...(preferences.skills ?? '').split('|'),
+    ]
+      .map((term) => term.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (!terms.length) {
+      return true;
+    }
+
+    const haystack = [
+      job.title ?? '',
+      job.description ?? '',
+      ...(Array.isArray(job.skills) ? job.skills : []),
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return terms.some((term) => haystack.includes(term));
   }
 
   private static matchesBudgetPreferences(
