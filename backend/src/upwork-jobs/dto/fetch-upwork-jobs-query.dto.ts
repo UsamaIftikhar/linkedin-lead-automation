@@ -9,6 +9,12 @@ import {
 } from 'class-validator';
 
 export class FetchUpworkJobsQueryDto {
+  /** Ignored by `GET /upwork-jobs/fetch` — allowed so cron-style URLs do not trigger 422/400 validation. Use `/cron/fetch` when you need secret auth + notifications. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  cron_secret?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

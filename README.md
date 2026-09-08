@@ -6,7 +6,7 @@ A production-oriented full-stack system for sourcing job-based leads, enriching 
 
 - Backend: NestJS, Prisma, PostgreSQL (Supabase), node-cron via `@nestjs/schedule`, Axios, Resend
 - Frontend: Next.js App Router, Tailwind CSS, React Query
-- APIs: RapidAPI JSearch, Hunter.io, Resend
+- APIs: RapidAPI JSearch, official Upwork MCP, Hunter.io, Resend
 
 ## Features
 
@@ -82,6 +82,42 @@ The backend cron job runs once per day using `CRON_SCHEDULE` and performs:
 5. Controlled email sending with Resend
 
 Set `DEFAULT_JOB_KEYWORDS` and `DEFAULT_JOB_LOCATIONS` as comma-separated values to drive the scheduled runs.
+
+## Upwork MCP setup
+
+Upwork job discovery uses Upwork's official remote MCP server at
+`https://mcp.upwork.com/mcp`. It no longer uses an Upwork RapidAPI endpoint or
+browser session cookies.
+
+1. Add the following backend variables:
+
+```dotenv
+UPWORK_MCP_URL="https://mcp.upwork.com/mcp"
+UPWORK_MCP_REDIRECT_URI="http://localhost:3001/api/upwork-jobs/mcp/callback"
+UPWORK_MCP_SUCCESS_REDIRECT_URI="http://localhost:3000/upwork?upwork_mcp=connected"
+UPWORK_MCP_CREDENTIALS_ENCRYPTION_KEY="<32-byte base64 value>"
+```
+
+Generate the encryption value once with `openssl rand -base64 32`. Keep the
+same value across deployments; changing it makes the stored OAuth session
+unreadable and requires reconnecting Upwork.
+
+2. Apply the `upwork_mcp_auth` table and restart the backend:
+
+```bash
+cd backend
+npm run db:push
+npm run start:dev
+```
+
+3. Open the dashboard's Upwork page, select **Connect Upwork**, and approve the
+OAuth prompt. Manual and cron fetches reuse that encrypted, refreshable OAuth
+session. In production, set both redirect variables to the public backend and
+frontend HTTPS URLs before connecting.
+
+The search form and `UPWORK_CRON_*` variables remain the source of job
+preferences. Results still pass through the local keyword, budget, client,
+competition, scoring, deduplication, and notification rules.
 
 ## Deployment
 

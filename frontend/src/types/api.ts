@@ -66,12 +66,7 @@ export interface EmailDraftResponse {
   body: string;
   lead: Pick<
     Lead,
-    | 'id'
-    | 'companyName'
-    | 'jobTitle'
-    | 'location'
-    | 'email'
-    | 'contacted'
+    'id' | 'companyName' | 'jobTitle' | 'location' | 'email' | 'contacted'
   >;
   source: EmailDraftSource;
   subject: string;
@@ -153,9 +148,22 @@ export interface FetchUpworkJobsParams {
 export interface FetchUpworkJobsResult {
   excludedByFilter: number;
   inserted: number;
+  insertedJobIds: string[];
   nextCursor: string | null;
   skipped: number;
   totalFromApi: number;
+}
+
+export interface UpworkMcpStatus {
+  configured: boolean;
+  connected: boolean;
+  serverUrl: string;
+}
+
+export interface UpworkMcpConnectResult {
+  authorizationUrl: string | null;
+  connected: boolean;
+  toolNames: string[];
 }
 
 export interface GenerateUpworkProposalResponse {

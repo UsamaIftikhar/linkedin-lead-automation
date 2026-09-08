@@ -105,3 +105,14 @@ model UpworkProposalDraft {
   @@index([upworkJobId], map: "upwork_proposal_draft_job_idx")
   @@map("upwork_proposal_drafts")
 }
+
+/// Single encrypted OAuth session used by the server-side Upwork MCP client.
+/// The access/refresh tokens are encrypted before they reach this table.
+model UpworkMcpAuth {
+  id               String   @id @default("default")
+  encryptedPayload String   @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("upwork_mcp_auth")
+}

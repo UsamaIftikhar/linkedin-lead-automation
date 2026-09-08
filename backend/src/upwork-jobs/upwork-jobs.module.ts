@@ -5,6 +5,7 @@ import { UpworkJobsController } from './upwork-jobs.controller';
 import { UpworkCronNotifyService } from './upwork-cron-notify.service';
 import { UpworkDailySummaryService } from './upwork-daily-summary.service';
 import { UpworkJobsService } from './upwork-jobs.service';
+import { UpworkMcpService } from './upwork-mcp.service';
 
 @Module({
   controllers: [UpworkJobsController],
@@ -13,6 +14,7 @@ import { UpworkJobsService } from './upwork-jobs.service';
     UpworkCronNotifyService,
     UpworkDailySummaryService,
     UpworkJobsService,
+    UpworkMcpService,
   ],
 })
 export class UpworkJobsModule {}

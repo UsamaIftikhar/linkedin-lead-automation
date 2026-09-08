@@ -59,17 +59,25 @@ export function validateEnv(config: Record<string, unknown>) {
       'JSEARCH_ENDPOINT',
       'https://jsearch.p.rapidapi.com/search',
     ),
-    UPWORK_RAPIDAPI_HOST: readString(
-      config,
-      'UPWORK_RAPIDAPI_HOST',
-      'upwork-jobs-api3.p.rapidapi.com',
-    ),
-    UPWORK_RAPIDAPI_URL: readString(
-      config,
-      'UPWORK_RAPIDAPI_URL',
-      'https://upwork-jobs-api3.p.rapidapi.com/upwork',
-    ),
     UPWORK_CRON_SECRET: readString(config, 'UPWORK_CRON_SECRET'),
+    UPWORK_MCP_URL: readString(
+      config,
+      'UPWORK_MCP_URL',
+      'https://mcp.upwork.com/mcp',
+    ),
+    UPWORK_MCP_REDIRECT_URI: readString(config, 'UPWORK_MCP_REDIRECT_URI'),
+    UPWORK_MCP_SUCCESS_REDIRECT_URI: readString(
+      config,
+      'UPWORK_MCP_SUCCESS_REDIRECT_URI',
+    ),
+    UPWORK_MCP_CREDENTIALS_ENCRYPTION_KEY: readString(
+      config,
+      'UPWORK_MCP_CREDENTIALS_ENCRYPTION_KEY',
+    ),
+    UPWORK_MCP_JOB_SEARCH_TOOL: readString(
+      config,
+      'UPWORK_MCP_JOB_SEARCH_TOOL',
+    ),
     UPWORK_CRON_Q: readString(config, 'UPWORK_CRON_Q'),
     UPWORK_CRON_SKILLS: readString(config, 'UPWORK_CRON_SKILLS'),
     UPWORK_CRON_SKILLS_MATCH_MODE: readString(
@@ -95,10 +103,7 @@ export function validateEnv(config: Record<string, unknown>) {
       config,
       'UPWORK_CONNECTS_USED_TODAY',
     ),
-    UPWORK_CONNECTS_REMAINING: readString(
-      config,
-      'UPWORK_CONNECTS_REMAINING',
-    ),
+    UPWORK_CONNECTS_REMAINING: readString(config, 'UPWORK_CONNECTS_REMAINING'),
     SLACK_WEBHOOK_URL: readString(config, 'SLACK_WEBHOOK_URL'),
     SLACK_BOT_TOKEN: readString(config, 'SLACK_BOT_TOKEN'),
     SLACK_SIGNING_SECRET: readString(config, 'SLACK_SIGNING_SECRET'),

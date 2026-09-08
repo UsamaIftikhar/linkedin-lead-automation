@@ -4,7 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
-import { fetchUpworkJobs, getUpworkJobs } from '@/lib/api';
+import {
+  connectUpworkMcp,
+  fetchUpworkJobs,
+  getUpworkJobs,
+  getUpworkMcpStatus,
+} from '@/lib/api';
 import {
   scoreUpworkJob,
   tierBadgeClass,
@@ -13,6 +18,23 @@ import {
 import type { FetchUpworkJobsParams, UpworkJob } from '@/types/api';
 import { SavedProposalViewModal } from './saved-proposal-view-modal';
 import { UpworkProposalModal } from './upwork-proposal-modal';
+
+const NEW_UPWORK_JOB_IDS_KEY = 'new-upwork-job-ids';
+
+function readStoredNewJobIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(NEW_UPWORK_JOB_IDS_KEY) ?? '[]',
+    ) as unknown;
+    return Array.isArray(stored)
+      ? new Set(stored.filter((id): id is string => typeof id === 'string'))
+      : new Set();
+  } catch {
+    window.localStorage.removeItem(NEW_UPWORK_JOB_IDS_KEY);
+    return new Set();
+  }
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof AxiosError) {
@@ -55,10 +77,7 @@ function budgetDetails(job: UpworkJob): ReactNode {
       </span>,
     );
   } else if (job.budgetType?.toLowerCase() === 'hourly') {
-    if (
-      job.hourlyMinUsd != null &&
-      job.hourlyMaxUsd != null
-    ) {
+    if (job.hourlyMinUsd != null && job.hourlyMaxUsd != null) {
       lines.push(
         <span key="hr" className="font-medium">
           ${job.hourlyMinUsd}–${job.hourlyMaxUsd}/hr
@@ -113,7 +132,7 @@ function activityDetails(job: UpworkJob): ReactNode {
   if (job.interviewing != null && job.interviewing.trim() !== '') {
     rows.push({
       key: 'interviewing',
-      label: 'Interviewing',
+      label: 'Invited to interview',
       value: job.interviewing.trim(),
     });
   }
@@ -159,6 +178,7 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
   const [nextCursor, setNextCursor] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [fetchSummary, setFetchSummary] = useState<string | null>(null);
+  const [newJobIds, setNewJobIds] = useState(readStoredNewJobIds);
   const fetchSummaryRef = useRef<HTMLDivElement>(null);
   const [proposalJob, setProposalJob] = useState<UpworkJob | null>(null);
   const [viewSavedProposal, setViewSavedProposal] = useState<{
@@ -170,6 +190,23 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
   const jobsQuery = useQuery({
     queryFn: getUpworkJobs,
     queryKey: ['upwork-jobs'],
+  });
+
+  const mcpStatusQuery = useQuery({
+    queryFn: getUpworkMcpStatus,
+    queryKey: ['upwork-mcp-status'],
+  });
+
+  const connectMcpMutation = useMutation({
+    mutationFn: connectUpworkMcp,
+    onError: (err) => setLocalError(getErrorMessage(err)),
+    onSuccess: async (result) => {
+      if (result.authorizationUrl) {
+        window.location.assign(result.authorizationUrl);
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['upwork-mcp-status'] });
+    },
   });
 
   const fetchMutation = useMutation({
@@ -184,15 +221,21 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
         : '';
       const filterHint =
         result.excludedByFilter > 0
-          ? ` ${result.excludedByFilter} job(s) skipped (same rules as cron: India, invites sent, 50+ proposals, disqualifying keywords, budget under $300 fixed / $15/hr, or client with no spend and no reviews).`
+          ? ` ${result.excludedByFilter} job(s) skipped by your budget and quality preferences.`
           : '';
-      const summary = `Upwork: saved ${result.inserted} new row(s) (${result.skipped} duplicates skipped; ${result.totalFromApi} from API).${filterHint}${cursorHint}`;
+      const summary = `Upwork: saved ${result.inserted} new row(s) (${result.skipped} duplicates skipped; ${result.totalFromApi} from MCP).${filterHint}${cursorHint}`;
       setFetchSummary(summary);
       onSaved?.(summary);
       if (result.nextCursor) {
         setNextCursor(result.nextCursor);
       }
       await queryClient.refetchQueries({ queryKey: ['upwork-jobs'] });
+      const insertedJobIds = result.insertedJobIds ?? [];
+      setNewJobIds(new Set(insertedJobIds));
+      window.localStorage.setItem(
+        NEW_UPWORK_JOB_IDS_KEY,
+        JSON.stringify(insertedJobIds),
+      );
     },
   });
 
@@ -263,21 +306,65 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
       <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            Upwork (RapidAPI)
+            Upwork (official MCP)
           </p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
             Search and store Upwork jobs
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-            Fetches from the Upwork jobs API and inserts into{' '}
-            <code className="rounded bg-slate-100 px-1 text-xs">upwork_jobs</code>.
-            Jobs are omitted (not saved) when the location lists India, invites
-            have been sent, proposals indicate 50+, disqualifying keywords match,
-            fixed budget is under $300 or hourly under $15, or the client has no
-            spend and no reviews. Duplicate{' '}
-            <code className="rounded bg-slate-100 px-1 text-xs">job_id</code>s are
-            skipped.
+            Searches Upwork through your authenticated freelancer account and
+            inserts matches into{' '}
+            <code className="rounded bg-slate-100 px-1 text-xs">
+              upwork_jobs
+            </code>
+            . Jobs are omitted (not saved) when the location lists India,
+            invites have been sent, proposals indicate 50+, disqualifying
+            keywords match, the selected budget range, or the client explicitly
+            has no spend and no reviews. Duplicate{' '}
+            <code className="rounded bg-slate-100 px-1 text-xs">job_id</code>s
+            are skipped.
           </p>
+        </div>
+
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-emerald-950">
+              {mcpStatusQuery.data?.connected
+                ? 'Upwork account connected'
+                : 'Connect your Upwork account'}
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-800">
+              OAuth credentials stay encrypted in your database and are
+              refreshed automatically by the MCP client.
+            </p>
+          </div>
+          {mcpStatusQuery.data?.connected ? (
+            <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">
+              Connected
+            </span>
+          ) : (
+            <button
+              className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+              disabled={
+                connectMcpMutation.isPending ||
+                mcpStatusQuery.isLoading ||
+                mcpStatusQuery.data?.configured === false
+              }
+              onClick={() => {
+                setLocalError(null);
+                connectMcpMutation.mutate();
+              }}
+              type="button"
+            >
+              {connectMcpMutation.isPending ? 'Connecting…' : 'Connect Upwork'}
+            </button>
+          )}
+          {mcpStatusQuery.data?.configured === false ? (
+            <p className="basis-full text-xs font-medium text-rose-700">
+              The backend MCP redirect URI and encryption key must be configured
+              first.
+            </p>
+          ) : null}
         </div>
 
         <form
@@ -299,7 +386,9 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
             />
           </label>
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-slate-700">Skills (pipe-separated)</span>
+            <span className="font-medium text-slate-700">
+              Skills (pipe-separated)
+            </span>
             <input
               className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100/80"
               disabled={pending}
@@ -308,7 +397,9 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
             />
           </label>
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-slate-700">Skills match mode</span>
+            <span className="font-medium text-slate-700">
+              Skills match mode
+            </span>
             <select
               className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100/80"
               disabled={pending}
@@ -395,10 +486,10 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
           <div className="flex flex-wrap gap-2 lg:col-span-2">
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-6 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-800 disabled:opacity-50"
-              disabled={pending}
+              disabled={pending || !mcpStatusQuery.data?.connected}
               type="submit"
             >
-              {pending ? 'Fetching…' : 'Fetch & save to database'}
+              {pending ? 'Fetching…' : 'Fetch from Upwork & save'}
             </button>
             <button
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
@@ -432,7 +523,9 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
       <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">Upwork jobs</h2>
+            <h2 className="text-xl font-semibold text-slate-950">
+              Upwork jobs
+            </h2>
             <p className="text-sm text-slate-500">
               Sorted by opportunity score (fresh posts, low proposals, strong
               clients first). Colors show priority tiers.
@@ -479,11 +572,17 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
                 <th className="px-4 py-3 font-medium text-slate-500">
                   Proposals & pipeline
                 </th>
-                <th className="px-4 py-3 font-medium text-slate-500">Location</th>
-                <th className="px-4 py-3 font-medium text-slate-500">Published</th>
+                <th className="px-4 py-3 font-medium text-slate-500">
+                  Location
+                </th>
+                <th className="px-4 py-3 font-medium text-slate-500">
+                  Published
+                </th>
                 <th className="px-4 py-3 font-medium text-slate-500">Client</th>
                 <th className="px-4 py-3 font-medium text-slate-500">Skills</th>
-                <th className="px-4 py-3 font-medium text-slate-500">Actions</th>
+                <th className="px-4 py-3 font-medium text-slate-500">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -506,22 +605,29 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <a
-                      className="font-medium text-slate-900 hover:text-emerald-700"
-                      href={job.url}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {job.title}
-                    </a>
+                    <div className="flex items-start gap-2">
+                      <a
+                        className="font-medium text-slate-900 hover:text-emerald-700"
+                        href={job.url}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {job.title}
+                      </a>
+                      {newJobIds.has(job.id) ? (
+                        <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-sky-800 ring-1 ring-inset ring-sky-200">
+                          New
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="mt-1 text-xs text-slate-500">
                       {job.categoryName ?? '—'}
-                      {job.experienceLevel
-                        ? ` · ${job.experienceLevel}`
-                        : ''}
+                      {job.experienceLevel ? ` · ${job.experienceLevel}` : ''}
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-slate-600">{budgetDetails(job)}</td>
+                  <td className="px-4 py-4 text-slate-600">
+                    {budgetDetails(job)}
+                  </td>
                   <td className="min-w-[140px] px-4 py-4 text-slate-600">
                     {activityDetails(job)}
                   </td>
