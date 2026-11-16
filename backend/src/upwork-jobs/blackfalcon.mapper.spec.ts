@@ -127,3 +127,4 @@ describe('mapBlackfalconItem', () => {
     ).toThrow('Invalid or missing publishTime for job 2122335221823763736');
   });
 });
+

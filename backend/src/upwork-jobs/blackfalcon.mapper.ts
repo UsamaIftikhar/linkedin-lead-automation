@@ -231,3 +231,4 @@ export function mapBlackfalconItem(raw: RawBlackfalconItem): MappedUpworkJob {
     isRepost,
   };
 }
+

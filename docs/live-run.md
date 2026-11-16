@@ -65,3 +65,4 @@ Option B: **Via HTTP Endpoint**
 - [ ] Trigger a second run immediately after the first.
 - [ ] Verify the backend logs report 0 new jobs inserted and 0 duplicate Slack messages sent.
 - [ ] Verify on the dashboard table that sent jobs display `Sent to Slack` status tag, and rejected jobs display `Rejected` with the logged reason.
+

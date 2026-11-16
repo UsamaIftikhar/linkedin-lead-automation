@@ -114,3 +114,4 @@ export class ApifyService implements OnModuleInit {
     return mappedJobs;
   }
 }
+
