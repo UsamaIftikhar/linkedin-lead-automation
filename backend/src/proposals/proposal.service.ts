@@ -102,10 +102,54 @@ export class ProposalService {
     system: string,
     user: string,
   ): Promise<{ model: string; text: string }> {
-    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY')?.trim();
-    if (!apiKey) {
+    const deepseekKey = this.configService.get<string>('DEEPSEEK_API_KEY')?.trim();
+    const openrouterKey = this.configService.get<string>('OPENROUTER_API_KEY')?.trim();
+
+    if (deepseekKey) {
+      const model =
+        this.configService.get<string>('DEEPSEEK_MODEL')?.trim() || 'deepseek-chat';
+      const url = 'https://api.deepseek.com/chat/completions';
+
+      const response = await fetch(url, {
+        body: JSON.stringify({
+          messages: [
+            { content: system, role: 'system' },
+            { content: user, role: 'user' },
+          ],
+          model,
+          stream: false,
+        }),
+        headers: {
+          Authorization: `Bearer ${deepseekKey}`,
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+      });
+
+      const data = (await response.json()) as CompletionResponse;
+
+      if (!response.ok) {
+        const msg =
+          data?.error?.message ||
+          `DeepSeek error (${response.status}) while generating proposal.`;
+        throw new ServiceUnavailableException(msg);
+      }
+
+      const raw = data.choices?.[0]?.message?.content;
+      const text =
+        typeof raw === 'string' ? raw.trim() : String(raw ?? '').trim();
+      if (!text) {
+        throw new ServiceUnavailableException(
+          'DeepSeek returned an empty proposal.',
+        );
+      }
+
+      return { model, text };
+    }
+
+    if (!openrouterKey) {
       throw new ServiceUnavailableException(
-        'OPENROUTER_API_KEY is required to generate proposals.',
+        'DEEPSEEK_API_KEY (or OPENROUTER_API_KEY) is required to generate proposals.',
       );
     }
 
@@ -125,7 +169,7 @@ export class ProposalService {
         stream: false,
       }),
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${openrouterKey}`,
         'Content-Type': 'application/json',
       },
       method: 'POST',

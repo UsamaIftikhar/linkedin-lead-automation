@@ -351,15 +351,57 @@ export class SlackUpworkThreadService {
       }
       throw err;
     }
-    if (!row) {
-      this.logger.warn(
-        `Slack: "generate proposal" in thread but no job mapping for channel=${ev.channel} thread_ts=${ev.thread_ts} (post jobs via this app’s bot/webhook so each job gets a stored message ts).`,
+    if (!row && token) {
+      this.logger.log(
+        `Slack thread has no direct DB mapping; inspecting parent message in channel=${ev.channel} thread_ts=${ev.thread_ts}...`,
       );
-      return;
+      try {
+        const threadRes = await axios.get(
+          'https://slack.com/api/conversations.replies',
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { channel: ev.channel, ts: ev.thread_ts, limit: 1 },
+          },
+        );
+        const parentMsg = threadRes.data?.messages?.[0];
+        const rawText = JSON.stringify(parentMsg ?? '');
+        const match =
+          rawText.match(/upwork\.com\/jobs\/~0[12]?(\d+)/i) ||
+          rawText.match(/jobs\/~(\d+)/i);
+
+        if (match && match[1]) {
+          const extractedId = match[1];
+          const found = await this.prisma.upworkJob.findFirst({
+            where: {
+              OR: [
+                { upworkJobId: extractedId },
+                { upworkJobId: { contains: extractedId } },
+                { url: { contains: extractedId } },
+              ],
+            },
+            select: { id: true },
+          });
+
+          if (found) {
+            row = { upworkJobId: found.id };
+            await this.prisma.slackUpworkJobMessage
+              .create({
+                data: {
+                  channelId: ev.channel.trim(),
+                  messageTs: ev.thread_ts.trim(),
+                  upworkJobId: found.id,
+                },
+              })
+              .catch(() => undefined);
+            this.logger.log(
+              `Recovered Upwork job ${found.id} from parent message link; cached mapping.`,
+            );
+          }
+        }
+      } catch (inspectErr) {
+        this.logger.warn(`Failed to inspect thread parent message: ${inspectErr}`);
+      }
     }
-    this.logger.log(
-      `Slack thread command mapped thread to Upwork job ${row.upworkJobId}; starting proposal generation.`,
-    );
 
     const reply = async (t: string) => {
       this.logger.log(
@@ -417,6 +459,20 @@ export class SlackUpworkThreadService {
         `Slack thread reply sent via webhook channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
       );
     };
+
+    if (!row) {
+      this.logger.warn(
+        `Slack: "generate proposal" in thread but no job mapping for channel=${ev.channel} thread_ts=${ev.thread_ts}.`,
+      );
+      await reply(
+        '⚠️ Could not find a linked Upwork job in the database for this thread.',
+      ).catch(() => undefined);
+      return;
+    }
+
+    this.logger.log(
+      `Slack thread command mapped thread to Upwork job ${row.upworkJobId}; starting proposal generation.`,
+    );
 
     try {
       await reply('_Generating proposal…_');

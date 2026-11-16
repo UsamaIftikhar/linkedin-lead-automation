@@ -147,6 +147,8 @@ export function validateEnv(config: Record<string, unknown>) {
       'OPENROUTER_PROPOSAL_MODEL',
       'deepseek/deepseek-v4-flash',
     ),
+    DEEPSEEK_API_KEY: readString(config, 'DEEPSEEK_API_KEY'),
+    DEEPSEEK_MODEL: readString(config, 'DEEPSEEK_MODEL', 'deepseek-chat'),
     APIFY_TOKEN: readString(config, 'APIFY_TOKEN'),
     APIFY_ACTOR_ID: readString(
       config,
