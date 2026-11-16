@@ -1,0 +1,238 @@
+[
+  {
+    "jobId": "2122335221823763736",
+    "title": "AI Agencies and Senior Engineers",
+    "description": "Strong build team, thin pipeline? Read on.\nWolf of Digital Partners is the partnership program of Wolf of Digital. \n\nWe are building a vetted network of AI engineers and AI service companies. We bring the clients and the go-to-market: positioning, pipeline, and sales. You bring the build.\n\nThis post is intake for the partner program. It is not an Upwork contract and not a job offer. The work is real client project flow, structured as partner engagements, not a salaried job. No guaranteed hours or volume.\n\nHow the partnership works:\nTwo tracks:\nService companies and engineers without a product of their own: Wolf acts as strategic JV partner. We run market validation and build a go-to-market plan with you, productizing one of your case studies into an offer for a chosen market.\n\nPre-revenue product startups: validate first, win the first clients, then raise.\nTerms are set per engagement. Nothing is guaranteed.\nWhat partners build: AI agents, voice agents, workflow automation, intake and scheduling automation, CRM and systems integrations.\nWhere demand is active: healthcare practices, accounting and finance firms, professional services, home services.\nWho should apply: AI development agencies and dev shops with available bench capacity; senior AI engineers who ship production systems, not demos; teams that can show at least one live product or client deployment.\nWho should not apply: beginners or tutorial-level builders; prompt-only profiles with nothing in production; anyone looking for a salaried full-time job.\n\nBacked by Wolf of Digital: 15+ years in market, 1,000+ business owners helped, $10M+ in sales closed, $100M+ in sales influenced, 5-star rated on Clutch.\n\nAfter applying: every application is read in full, review can take up to a few weeks; after you apply here, we message you the partner application link; shortlisted applicants get an interview invitation by email.\n\nAll payments and contracts are done only on upwork.",
+    "contentHash": "80d8f7ddcd129068c1893f517528b568b0483f4fb622156849337ff3063f79aa",
+    "jobType": "HOURLY",
+    "experienceLevel": "IntermediateLevel",
+    "budgetAmount": null,
+    "budgetCurrency": null,
+    "hourlyBudgetMin": 20,
+    "hourlyBudgetMax": 57,
+    "weeklyRetainerBudget": null,
+    "salaryMin": 20,
+    "salaryMax": 57,
+    "salaryCurrency": "USD",
+    "salaryType": "HOURLY",
+    "engagementType": "FULL_TIME",
+    "engagementDuration": "More than 6 months",
+    "engagementDurationWeeks": 52,
+    "skills": [
+      "Generative AI",
+      "AI Development",
+      "Chatbot Development",
+      "Automated Workflow",
+      "Natural Language Processing",
+      "Python",
+      "React",
+      "Machine Learning",
+      "Artificial Intelligence",
+      "Data Science"
+    ],
+    "skillsDetailed": [
+      {
+        "uid": "1631308909400477696",
+        "parentSkillUid": null,
+        "name": "Generative AI",
+        "highlighted": false
+      },
+      {
+        "uid": "1691099314254262272",
+        "parentSkillUid": null,
+        "name": "AI Development",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626723769696256",
+        "parentSkillUid": null,
+        "name": "Chatbot Development",
+        "highlighted": false
+      },
+      {
+        "uid": "1270387293403987968",
+        "parentSkillUid": null,
+        "name": "Automated Workflow",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626761858170880",
+        "parentSkillUid": null,
+        "name": "Natural Language Processing",
+        "highlighted": false
+      },
+      {
+        "uid": "996364628025274386",
+        "parentSkillUid": null,
+        "name": "Python",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626773660942336",
+        "parentSkillUid": null,
+        "name": "React",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626755474440192",
+        "parentSkillUid": null,
+        "name": "Machine Learning",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626716094119936",
+        "parentSkillUid": null,
+        "name": "Artificial Intelligence",
+        "highlighted": false
+      },
+      {
+        "uid": "1031626730384113664",
+        "parentSkillUid": null,
+        "name": "Data Science",
+        "highlighted": false
+      }
+    ],
+    "publishTime": "2026-11-16T17:33:01.213Z",
+    "createTime": "2026-11-16T14:25:23.131Z",
+    "sourcingTimestamp": null,
+    "totalApplicants": 1,
+    "personsToHire": 1,
+    "enterpriseJob": false,
+    "premium": false,
+    "clientCountry": "United States",
+    "clientCountryCode": "USA",
+    "clientTotalSpent": 12016.72,
+    "clientSpentCurrency": "USD",
+    "clientPaymentVerified": true,
+    "clientRating": 4.99,
+    "clientReviewCount": 6,
+    "clientHasFinancialPrivacy": false,
+    "customJobScore": 4.25,
+    "extractedEmails": [],
+    "extractedPhones": [],
+    "extractedUrls": [],
+    "socialProfiles": {
+      "linkedin": null,
+      "twitter": null,
+      "instagram": null,
+      "facebook": null,
+      "youtube": null,
+      "tiktok": null,
+      "github": null,
+      "xing": null,
+      "bluesky": null,
+      "threads": null,
+      "mastodon": null
+    },
+    "contactName": null,
+    "contactEmail": null,
+    "contactPhone": null,
+    "url": "https://www.upwork.com/jobs/~022122335221823763736",
+    "portalUrl": "https://www.upwork.com/jobs/~022122335221823763736",
+    "scrapedAt": "2026-11-16T17:36:41.141Z",
+    "source": "upwork.com",
+    "changeType": "NEW",
+    "isRepost": false,
+    "repostOfId": null,
+    "repostDetectedAt": null,
+    "firstSeenAt": "2026-11-16T17:36:41.141Z",
+    "lastSeenAt": "2026-11-16T17:36:41.141Z"
+  },
+  {
+    "jobId": "2122336474127065543",
+    "title": "Full-Stack Low-Code Developer | FlutterFlow, Supabase, Mobile & Web MVP",
+    "description": "Project Type: MVP Development\nExperience Level: Intermediate to Expert\nContract Type: Fixed-price, milestone-based\nLocation: Worldwide\nBudget: Open to competitive proposals\n\nAbout the Project\n\nWe are an early-stage PropTech startup looking for an experienced Full-Stack Low-Code Developer to build the first version of our mobile application and web-based administration dashboard.\n\nOur goal is to launch a functional, scalable, and cost-effective MVP using low-code/no-code technologies.\n\nWe are looking for a hands-on developer who can manage both frontend and backend development, not someone who only builds UI screens.\n\nOur Product Manager and UI/UX Designer will provide the product requirements, user journeys, and Figma designs.\n\nScope of Work\n\nThe selected developer will be responsible for:\n\nMobile Application\n\n- Develop a functional application for iOS and Android.\n- Implement approved Figma designs.\n- Build dynamic screens connected to a live database.\n- Implement user registration, authentication, and account management.\n- Develop data entry, management, and tracking functionality.\n- Implement dashboards, notifications, and document uploads.\n- Support English and Arabic, including RTL layouts.\n\nBackend & Database\n\n- Design and implement the database architecture.\n- Build secure authentication and user access controls.\n- Implement backend workflows and business logic.\n- Configure API integrations and webhooks where required.\n- Implement secure file storage and scheduled backend processes.\n- Ensure proper data validation, security, and error handling.\n\nWeb Administration Dashboard\n\n- Develop a secure, responsive admin dashboard.\n- Implement role-based access.\n- Build data management and administrative workflows.\n- Connect all functionality to the application's backend.\n\nPreferred Technology Stack\n\n- FlutterFlow for mobile and web development.\n- Supabase or Firebase for backend and database services.\n- REST APIs and webhooks for integrations.\n\nWe are open to alternative low-code solutions if the developer can clearly justify their technical and cost advantages.\n\nRequired Qualifications\n\n- Proven experience delivering complete low-code applications.\n- Strong frontend and backend development skills.\n- Hands-on experience with FlutterFlow and Supabase/Firebase.\n- Experience with relational databases and backend workflows.\n- Experience integrating APIs and third-party services.\n- Strong understanding of authentication, data security, and role-based permissions.\n- Experience with push notifications and scheduled tasks.\n- Experience deploying applications to iOS, Android, and web.\n- Ability to work from Figma designs.\n- Strong communication and problem-solving skills.\n\nProject Management & Delivery\n\nWe will work using a lean Agile approach with one- or two-week sprints.\n\nThe selected developer must:\n\n- Collaborate with our Product Manager and UI/UX Designer.\n- Provide regular progress updates and working demonstrations.\n- Follow agreed user stories and acceptance criteria.\n- Meet our Definition of Done (DoD) requirements.\n- Test and fix issues before submitting work for review.\n- Deliver agreed milestones with clear documentation.\n- Work within a startup-friendly budget.\n- Provide complete project handover, including access to the development environment, backend, and source code where supported.\n\nSelection Process\n\nWe will shortlist candidates based on their previous work, technical experience, communication, and proposed approach.\n\nShortlisted candidates may be invited to complete a small paid technical assessment before the full MVP contract is awarded.\n\nDetailed product documentation and designs will be shared with selected candidates at the appropriate stage.\n\n\nHow to Apply\n\nPlease answer the following questions:\n\n1- Have you built and launched complete mobile applications using FlutterFlow? Please share relevant examples.\n2- Can you independently develop both the frontend and dynamic backend?\n3- What is your experience with Supabase, Firebase, APIs, and backend workflows?\n4- Have you developed web-based administration dashboards?\n5- Can you implement authentication, secure databases, notifications, and file uploads?\n6- Have you worked on applications supporting both Arabic and English?\n7- What is your estimated timeline and budget range for a low-code mobile and web MVP?\n8- Are you comfortable working with fixed-price milestones and our Definition of Done?\n\nImportant: We are looking for a developer who can deliver a complete, working application, not just a visual prototype.\n\nPlease start your proposal with \"FULL-STACK MVP\" to confirm that you have read the job description.",
+    "contentHash": "a23222aa5fdf64a97d402bcafd1ce51bfc416a6d9bdee1a9e49317ed66a33c58",
+    "jobType": "HOURLY",
+    "experienceLevel": "IntermediateLevel",
+    "budgetAmount": null,
+    "budgetCurrency": null,
+    "hourlyBudgetMin": null,
+    "hourlyBudgetMax": null,
+    "weeklyRetainerBudget": null,
+    "salaryMin": null,
+    "salaryMax": null,
+    "salaryCurrency": "USD",
+    "salaryType": "HOURLY",
+    "engagementType": "PART_TIME",
+    "engagementDuration": "1 to 3 months",
+    "engagementDurationWeeks": 9,
+    "skills": [
+      "Agile Software Development",
+      "Full-Stack Development",
+      "FlutterFlow",
+      "Supabase"
+    ],
+    "skillsDetailed": [
+      {
+        "uid": "1031626711035789312",
+        "parentSkillUid": null,
+        "name": "Agile Software Development",
+        "highlighted": false
+      },
+      {
+        "uid": "1484275089215770624",
+        "parentSkillUid": null,
+        "name": "Full-Stack Development",
+        "highlighted": false
+      },
+      {
+        "uid": "1691099313809666048",
+        "parentSkillUid": null,
+        "name": "FlutterFlow",
+        "highlighted": false
+      },
+      {
+        "uid": "1691099315067957248",
+        "parentSkillUid": null,
+        "name": "Supabase",
+        "highlighted": false
+      }
+    ],
+    "publishTime": "2026-11-16T17:30:23.095Z",
+    "createTime": "2026-11-16T14:30:21.821Z",
+    "sourcingTimestamp": null,
+    "totalApplicants": 3,
+    "personsToHire": 1,
+    "enterpriseJob": false,
+    "premium": false,
+    "clientCountry": "Egypt",
+    "clientCountryCode": "EGY",
+    "clientTotalSpent": 460.62,
+    "clientSpentCurrency": "USD",
+    "clientPaymentVerified": true,
+    "clientRating": 0,
+    "clientReviewCount": 0,
+    "clientHasFinancialPrivacy": false,
+    "customJobScore": 1.5,
+    "extractedEmails": [],
+    "extractedPhones": [],
+    "extractedUrls": [],
+    "socialProfiles": {
+      "linkedin": null,
+      "twitter": null,
+      "instagram": null,
+      "facebook": null,
+      "youtube": null,
+      "tiktok": null,
+      "github": null,
+      "xing": null,
+      "bluesky": null,
+      "threads": null,
+      "mastodon": null
+    },
+    "contactName": null,
+    "contactEmail": null,
+    "contactPhone": null,
+    "url": "https://www.upwork.com/jobs/~022122336474127065543",
+    "portalUrl": "https://www.upwork.com/jobs/~022122336474127065543",
+    "scrapedAt": "2026-11-16T17:36:41.141Z",
+    "source": "upwork.com",
+    "changeType": "NEW",
+    "isRepost": false,
+    "repostOfId": null,
+    "repostDetectedAt": null,
+    "firstSeenAt": "2026-11-16T17:36:41.141Z",
+    "lastSeenAt": "2026-11-16T17:36:41.141Z"
+  }
+]

@@ -147,5 +147,19 @@ export function validateEnv(config: Record<string, unknown>) {
       'OPENROUTER_PROPOSAL_MODEL',
       'deepseek/deepseek-v4-flash',
     ),
+    APIFY_TOKEN: readString(config, 'APIFY_TOKEN'),
+    APIFY_ACTOR_ID: readString(
+      config,
+      'APIFY_ACTOR_ID',
+      'blackfalcondata/upwork-scraper',
+    ),
+    APIFY_STATE_KEY: readString(
+      config,
+      'APIFY_STATE_KEY',
+      'upwork-leads-dev',
+    ),
+    APIFY_MAX_RESULTS: readNumber(config, 'APIFY_MAX_RESULTS', 50),
+    UPWORK_POLL_ENABLED: readString(config, 'UPWORK_POLL_ENABLED', 'true'),
+    SLACK_MIN_SCORE: readNumber(config, 'SLACK_MIN_SCORE', 40),
   };
 }
