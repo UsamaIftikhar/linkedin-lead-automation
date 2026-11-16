@@ -318,25 +318,37 @@ export class UpworkJobsService {
   ): Promise<{
     status: string;
     trigger: string;
+    message: string;
     fetched: number;
     inserted: number;
     rejected: number;
     sentToSlack: number;
     skippedBecauseBusy: boolean;
+    timestamp: string;
   }> {
     const { cron_secret: querySecret } = dto;
     const provided = (querySecret ?? headerSecret ?? '').trim();
     this.assertCronSecret(provided);
 
     const result = await this.pollAndProcessJobs('cronjob.org');
+    let message = 'Upwork poll completed successfully.';
+    if (result.fetched === 0) {
+      message =
+        '0 fresh jobs from Apify in this 10m window (either no new posts matching keywords or already scraped in incremental mode).';
+    } else {
+      message = `Processed ${result.fetched} jobs: ${result.sent} sent to Slack, ${result.rejected} rejected by filters, ${result.inserted} new rows stored.`;
+    }
+
     return {
       status: 'ok',
       trigger: 'cronjob.org',
+      message,
       fetched: result.fetched,
       inserted: result.inserted,
       rejected: result.rejected,
       sentToSlack: result.sent,
       skippedBecauseBusy: Boolean(result.skippedBecauseBusy),
+      timestamp: new Date().toISOString(),
     };
   }
 
