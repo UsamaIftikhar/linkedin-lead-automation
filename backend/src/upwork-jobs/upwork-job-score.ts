@@ -442,3 +442,79 @@ export function formatClientLine(job: UpworkJobScoreInput): string {
   }
   return parts.length ? parts.join(' · ') : 'Limited data on file';
 }
+
+export interface BlackfalconScoringInput {
+  matchedKeywords: string[];
+  proposalCount: number | null;
+  paymentVerified?: boolean | null;
+  fixedBudget?: number | null;
+  hourlyMin?: number | null;
+  hourlyMax?: number | null;
+  clientRating?: number | null;
+  clientReviewCount?: number | null;
+  clientTotalSpent?: number | null;
+}
+
+/**
+ * Score 0 to 100 based on Step 6 specifications:
+ * - Keyword matches: more matches score higher (up to 40 points)
+ * - Proposal count: lower is better (up to 25 points; 0 scores 25, 19 scores ~1)
+ * - Budget present (fixed or hourly): 15 points
+ * - Client rating and review count: up to 10 points
+ * - Client total spent: up to 10 points
+ */
+export function scoreBlackfalconJob(input: BlackfalconScoringInput): number {
+  let score = 0;
+
+  // 1. Keyword matches (up to 40)
+  const kwCount = input.matchedKeywords?.length ?? 0;
+  if (kwCount >= 3) {
+    score += 40;
+  } else if (kwCount === 2) {
+    score += 30;
+  } else if (kwCount === 1) {
+    score += 20;
+  }
+
+  // 2. Proposal count: lower is better (up to 25)
+  if (input.proposalCount != null && input.proposalCount >= 0) {
+    if (input.proposalCount < 20) {
+      score += Math.max(1, Math.round((25 * (19 - input.proposalCount)) / 19));
+    }
+  }
+
+  // 3. Budget present (15 points)
+  const hasBudget =
+    (input.fixedBudget != null && input.fixedBudget > 0) ||
+    (input.hourlyMin != null && input.hourlyMin > 0);
+  if (hasBudget) {
+    score += 15;
+  }
+
+  // 4. Client rating & review count (up to 10 points)
+  if (input.clientRating != null) {
+    if (input.clientRating >= 4.8 && (input.clientReviewCount ?? 0) >= 3) {
+      score += 10;
+    } else if (input.clientRating >= 4.5 && (input.clientReviewCount ?? 0) >= 1) {
+      score += 6;
+    } else if (input.clientRating >= 4.0) {
+      score += 3;
+    }
+  }
+
+  // 5. Client total spent (up to 10 points)
+  if (input.clientTotalSpent != null && input.clientTotalSpent > 0) {
+    if (input.clientTotalSpent >= 10000) {
+      score += 10;
+    } else if (input.clientTotalSpent >= 5000) {
+      score += 7;
+    } else if (input.clientTotalSpent >= 1000) {
+      score += 4;
+    } else {
+      score += 2;
+    }
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+

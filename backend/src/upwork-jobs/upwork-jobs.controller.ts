@@ -1,4 +1,12 @@
-import { Controller, Get, Headers, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Query,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FetchUpworkJobsQueryDto } from './dto/fetch-upwork-jobs-query.dto';
 import { UpworkCronFetchQueryDto } from './dto/upwork-cron-fetch-query.dto';
 import { UpworkDailySummaryService } from './upwork-daily-summary.service';
@@ -7,9 +15,29 @@ import { UpworkJobsService } from './upwork-jobs.service';
 @Controller('upwork-jobs')
 export class UpworkJobsController {
   constructor(
+    private readonly config: ConfigService,
     private readonly upworkDailySummary: UpworkDailySummaryService,
     private readonly upworkJobsService: UpworkJobsService,
   ) {}
+
+  @Post('poll')
+  async poll(
+    @Headers('x-admin-token') xAdminToken?: string,
+    @Query('admin_token') queryToken?: string,
+  ) {
+    const secret =
+      this.config.get<string>('ADMIN_TOKEN') ||
+      this.config.get<string>('UPWORK_CRON_SECRET');
+
+    if (secret) {
+      const provided = (xAdminToken || queryToken || '').trim();
+      if (!provided || provided !== secret.trim()) {
+        throw new UnauthorizedException('Invalid admin token');
+      }
+    }
+
+    return this.upworkJobsService.pollAndProcessJobs('api');
+  }
 
   /**
    * GET for cron-job.org (e.g. every 30 min). If `UPWORK_CRON_SECRET` is set, pass it as

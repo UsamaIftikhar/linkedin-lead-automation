@@ -5,7 +5,11 @@ import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProposalService } from '../proposals/proposal.service';
 import type { ScoredUpworkJobForNotify } from '../upwork-jobs/scored-job-notify.types';
-import { buildSingleJobSlackBlocks } from './slack-upwork-job-blocks';
+import {
+  buildSingleJobSlackBlocks,
+  buildBlackfalconSlackBlocks,
+  type SlackBlackfalconJobPayload,
+} from './slack-upwork-job-blocks';
 
 const SLACK_POST_URL = 'https://slack.com/api/chat.postMessage';
 const MAX_SLACK_TEXT = 3900;
@@ -503,5 +507,70 @@ export class SlackUpworkThreadService {
       detail: 'No SLACK_BOT_TOKEN + SLACK_UPWORK_CHANNEL_ID or SLACK_WEBHOOK_URL',
       ok: false,
     };
+  }
+
+  /**
+   * Delivers a qualified Upwork job to Slack webhook with up to 3 retries and exponential backoff.
+   */
+  async sendBlackfalconJobToWebhook(
+    job: SlackBlackfalconJobPayload,
+  ): Promise<boolean> {
+    const webhookUrl = this.configService
+      .get<string>('SLACK_WEBHOOK_URL')
+      ?.trim();
+
+    if (!webhookUrl) {
+      this.logger.warn('SLACK_WEBHOOK_URL is not configured.');
+      return false;
+    }
+
+    const blocks = buildBlackfalconSlackBlocks(job);
+    const payload = {
+      text: `${job.title} · Score: ${job.score}`,
+      blocks,
+    };
+
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await axios.post(webhookUrl, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10_000,
+        });
+
+        if (response.status === 200) {
+          return true;
+        }
+
+        this.logger.warn(
+          `Slack webhook returned non-200 status: ${response.status} (attempt ${attempt}/${maxRetries})`,
+        );
+      } catch (err: unknown) {
+        const isAxiosError = axios.isAxiosError(err);
+        const status = isAxiosError ? err.response?.status : undefined;
+        const msg = err instanceof Error ? err.message : String(err);
+
+        if (status && status >= 400 && status < 500 && status !== 429) {
+          this.logger.error(
+            `Permanent Slack webhook failure (status ${status}): ${msg}`,
+          );
+          return false;
+        }
+
+        this.logger.warn(
+          `Transient Slack webhook failure (attempt ${attempt}/${maxRetries}): ${msg}`,
+        );
+
+        if (attempt < maxRetries) {
+          const delayMs = 1000 * Math.pow(2, attempt - 1);
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    }
+
+    this.logger.error(
+      `Failed to send Slack webhook message after ${maxRetries} attempts for job: ${job.url}`,
+    );
+    return false;
   }
 }

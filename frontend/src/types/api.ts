@@ -131,6 +131,23 @@ export interface UpworkJob {
   updatedAt: string;
   /** Latest saved draft from proposal generator, if any. */
   latestProposal?: UpworkProposalSummary | null;
+  upworkJobId?: string | null;
+  postedAt?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  paymentVerified?: boolean | null;
+  proposalCount?: number | null;
+  jobType?: string | null;
+  fixedBudget?: number | null;
+  hourlyMin?: number | null;
+  hourlyMax?: number | null;
+  budgetText?: string | null;
+  score?: number | null;
+  changeType?: string | null;
+  isRepost?: boolean | null;
+  slackSentAt?: string | null;
+  rejectionReason?: string | null;
+  status?: 'sent' | 'rejected' | 'pending';
 }
 
 export interface FetchUpworkJobsParams {

@@ -7,6 +7,7 @@ import { AxiosError } from 'axios';
 import {
   fetchUpworkJobs,
   getUpworkJobs,
+  pollUpworkJobs,
 } from '@/lib/api';
 import {
   scoreUpworkJob,
@@ -220,8 +221,20 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
     },
   });
 
+  const pollMutation = useMutation({
+    mutationFn: () => pollUpworkJobs(),
+    onError: (err) => setLocalError(getErrorMessage(err)),
+    onSuccess: async (data) => {
+      setLocalError(null);
+      const summary = `Apify Pipeline: fetched ${data.fetched}, inserted ${data.inserted}, rejected ${data.rejected}, sent ${data.sent} to Slack.`;
+      setFetchSummary(summary);
+      onSaved?.(summary);
+      await queryClient.refetchQueries({ queryKey: ['upwork-jobs'] });
+    },
+  });
+
   const jobsData = jobsQuery.data;
-  const pending = fetchMutation.isPending;
+  const pending = fetchMutation.isPending || pollMutation.isPending;
 
   const rankedJobs = useMemo(() => {
     const list = jobsData ?? [];
@@ -431,6 +444,18 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
               {pending ? 'Fetching…' : 'Fetch from Upwork & save'}
             </button>
             <button
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-violet-700 px-6 text-sm font-semibold text-white shadow-md transition hover:bg-violet-800 disabled:opacity-50"
+              disabled={pending}
+              onClick={() => {
+                setLocalError(null);
+                setFetchSummary(null);
+                pollMutation.mutate();
+              }}
+              type="button"
+            >
+              {pollMutation.isPending ? 'Running Pipeline…' : 'Run Apify Pipeline Now'}
+            </button>
+            <button
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={pending}
               onClick={() => setNextCursor('')}
@@ -518,6 +543,7 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
                   Published
                 </th>
                 <th className="px-4 py-3 font-medium text-slate-500">Client</th>
+                <th className="px-4 py-3 font-medium text-slate-500">Status</th>
                 <th className="px-4 py-3 font-medium text-slate-500">Skills</th>
                 <th className="px-4 py-3 font-medium text-slate-500">
                   Actions
@@ -588,6 +614,28 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
                       </div>
                     ) : null}
                   </td>
+                  <td className="px-4 py-4">
+                    {job.status === 'sent' ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                        Sent to Slack
+                      </span>
+                    ) : job.status === 'rejected' ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                          Rejected
+                        </span>
+                        {job.rejectionReason ? (
+                          <span className="text-[11px] leading-tight text-rose-600">
+                            {job.rejectionReason}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        Pending
+                      </span>
+                    )}
+                  </td>
                   <td className="max-w-[200px] px-4 py-4 text-xs text-slate-600">
                     {formatSkills(job.skills)}
                   </td>
@@ -627,7 +675,7 @@ export function UpworkJobsPanel({ onSaved }: UpworkJobsPanelProps) {
                 <tr>
                   <td
                     className="px-6 py-8 text-center text-sm text-slate-500"
-                    colSpan={9}
+                    colSpan={10}
                   >
                     No Upwork jobs stored yet. Run a fetch above.
                   </td>

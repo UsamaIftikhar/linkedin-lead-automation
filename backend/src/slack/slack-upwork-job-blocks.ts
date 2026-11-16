@@ -85,3 +85,82 @@ export function buildSingleJobSlackBlocks(
     },
   ];
 }
+
+export interface SlackBlackfalconJobPayload {
+  title: string;
+  url: string;
+  score: number;
+  budgetText: string | null;
+  country: string | null;
+  countryCode: string | null;
+  proposalCount: number | null;
+  matchedKeywords: string[];
+  postedAt: Date;
+}
+
+/**
+ * Builds Slack Block Kit message per Step 7:
+ * - Title linked to url
+ * - Score
+ * - Budget
+ * - Country
+ * - Proposal count
+ * - Matched keywords
+ * - Posted time
+ * - "View job" button
+ * - NO contact or social fields
+ */
+export function buildBlackfalconSlackBlocks(
+  job: SlackBlackfalconJobPayload,
+): Record<string, unknown>[] {
+  const link = `<${job.url}|*${escapeSlackLinkLabel(job.title)}*>`;
+  const location = job.country || job.countryCode || 'Unknown';
+  const budget = job.budgetText || 'Not specified';
+  const proposals = job.proposalCount != null ? String(job.proposalCount) : 'Unknown';
+  const keywords = job.matchedKeywords.length ? job.matchedKeywords.join(', ') : 'None';
+  const posted = job.postedAt.toUTCString();
+
+  const textLines = [
+    `🎯 ${link}`,
+    `⭐ *Score:* ${job.score}/100`,
+    `💰 *Budget:* ${budget}`,
+    `📍 *Country:* ${location}`,
+    `📊 *Proposals:* ${proposals}`,
+    `🏷️ *Matched Keywords:* ${keywords}`,
+    `🕐 *Posted Time (UTC):* ${posted}`,
+  ].join('\n');
+
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: '⚡ Qualified Upwork Lead',
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: textLines,
+      },
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: 'View job',
+            emoji: true,
+          },
+          url: job.url,
+          action_id: 'view_job_button',
+        },
+      ],
+    },
+  ];
+}
+

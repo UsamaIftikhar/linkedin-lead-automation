@@ -28,17 +28,17 @@ interface CompletionResponse {
 
 function buildJobDescriptionText(input: {
   title: string;
-  description: string;
+  description: string | null;
   skills: unknown;
-  budgetType: string | null;
-  budgetTotalUsd: string | null;
-  hourlyMinUsd: number | null;
-  hourlyMaxUsd: number | null;
-  experienceLevel: string | null;
-  location: string | null;
-  projectLength: string | null;
-  hoursPerWeek: string | null;
-  categoryName: string | null;
+  budgetType?: string | null;
+  budgetTotalUsd?: string | null;
+  hourlyMinUsd?: number | null;
+  hourlyMaxUsd?: number | null;
+  experienceLevel?: string | null;
+  location?: string | null;
+  projectLength?: string | null;
+  hoursPerWeek?: string | null;
+  categoryName?: string | null;
 }): string {
   const skillsStr = Array.isArray(input.skills)
     ? (input.skills as unknown[])
@@ -169,15 +169,15 @@ export class ProposalService {
     const jobDescription = buildJobDescriptionText(job);
     const { context, summaries } =
       await this.retrievalService.getRelevantContext(jobDescription);
-    const detectedTemplate = detectProposalTemplate(job.title, job.description);
-    const semanticFit = calculateSemanticFit(job.title, job.description);
+    const detectedTemplate = detectProposalTemplate(job.title, job.description ?? '');
+    const semanticFit = calculateSemanticFit(job.title, job.description ?? '');
     const { system, user } = buildPrompt({
       context,
       detectedTemplate,
       job: {
         budget: formatBudgetLine(job),
         clientLocation: job.location ?? 'Not specified',
-        description: job.description,
+        description: job.description ?? '',
         title: job.title,
       },
       matchedKeywords: semanticFit.matchedKeywords,

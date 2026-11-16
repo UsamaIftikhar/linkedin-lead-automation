@@ -5,66 +5,255 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { timingSafeEqual } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { SlackUpworkThreadService } from '../slack/slack-upwork-thread.service';
+import { ApifyService } from './apify.service';
+import { MappedUpworkJob } from './blackfalcon.mapper';
+import { evaluateJobFilters } from './filters/job-filters';
+import { scoreBlackfalconJob } from './upwork-job-score';
 import { FetchUpworkJobsQueryDto } from './dto/fetch-upwork-jobs-query.dto';
 import type { UpworkCronFetchQueryDto } from './dto/upwork-cron-fetch-query.dto';
 import { UpworkCronNotifyService } from './upwork-cron-notify.service';
-import type { ScoredUpworkJobForNotify } from './scored-job-notify.types';
-import type { UpworkJobScoreInput } from './upwork-job-score';
-import {
-  formatBudgetLine,
-  formatClientLine,
-  formatPostedLine,
-  scoreUpworkJobRecord,
-} from './upwork-job-score';
-import { calculateSemanticFit, detectProposalTemplate } from './job-fit.util';
-
-export interface UpworkApiJob {
-  applied?: boolean;
-  job_id?: string;
-  url?: string;
-  title?: string;
-  description?: string;
-  published_at?: string;
-  skills?: string[];
-  budget_type?: string;
-  budget_total_usd?: string;
-  hourly_min_usd?: number;
-  hourly_max_usd?: number;
-  experience_level?: string;
-  location?: string;
-  project_length?: string;
-  hours_per_week?: string;
-  proposals?: string;
-  interviewing?: string | number;
-  invites_sent?: string | number;
-  client_total_hires?: number;
-  client_active_hires?: number;
-  client_spent?: string;
-  client_member_since?: string;
-  client_company_size?: string;
-  premium?: boolean;
-  category_name?: string;
-  category_group_name?: string;
-  client_score?: number;
-  client_feedback_count?: number;
-  total_jobs_with_hires?: number;
-  open_count?: number;
-  is_contract_to_hire?: boolean;
-  is_enterprise?: boolean;
-}
 
 @Injectable()
 export class UpworkJobsService {
   private readonly logger = new Logger(UpworkJobsService.name);
+  private isPolling = false;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly cronNotify: UpworkCronNotifyService,
+    private readonly apifyService: ApifyService,
+    private readonly slackThreadService: SlackUpworkThreadService,
   ) {}
+
+  @Cron('*/10 * * * *')
+  async handleScheduledPoll(): Promise<void> {
+    const enabled =
+      this.configService.get<string>('UPWORK_POLL_ENABLED')?.trim() !== 'false';
+    if (!enabled) {
+      this.logger.debug(
+        'Scheduled Upwork poll skipped (UPWORK_POLL_ENABLED is false).',
+      );
+      return;
+    }
+    await this.pollAndProcessJobs('cron');
+  }
+
+  async pollAndProcessJobs(trigger = 'manual'): Promise<{
+    fetched: number;
+    inserted: number;
+    rejected: number;
+    sent: number;
+    skippedBecauseBusy?: boolean;
+  }> {
+    if (this.isPolling) {
+      this.logger.log(
+        `Skipping poll tick (${trigger}): previous run is still in progress.`,
+      );
+      return {
+        fetched: 0,
+        inserted: 0,
+        rejected: 0,
+        sent: 0,
+        skippedBecauseBusy: true,
+      };
+    }
+
+    this.isPolling = true;
+    try {
+      this.logger.log(`Starting Upwork poll (${trigger})...`);
+      const mappedJobs = await this.apifyService.runAndFetchJobs();
+      const totalFetched = mappedJobs.length;
+
+      if (totalFetched === 0) {
+        this.logger.log(`0 fresh jobs fetched from Apify (${trigger}).`);
+        return { fetched: 0, inserted: 0, rejected: 0, sent: 0 };
+      }
+
+      const minFixedBudget =
+        Number(this.configService.get<number>('MIN_FIXED_BUDGET')) || 1000;
+      const minHourlyRate =
+        Number(this.configService.get<number>('MIN_HOURLY_RATE')) || 15;
+      const minScore =
+        Number(this.configService.get<number>('SLACK_MIN_SCORE')) || 40;
+
+      const passingJobs: Array<
+        MappedUpworkJob & { matchedKeywords: string[]; score: number }
+      > = [];
+      const rejectedJobs: Array<
+        MappedUpworkJob & { rejectionReason: string }
+      > = [];
+
+      for (const job of mappedJobs) {
+        const evaluation = evaluateJobFilters(job, {
+          minFixedBudget,
+          minHourlyRate,
+          now: new Date(),
+          maxAgeMinutes: 10,
+          maxProposals: 20,
+        });
+
+        if (evaluation.passed) {
+          const score = scoreBlackfalconJob({
+            matchedKeywords: evaluation.matchedKeywords,
+            proposalCount: job.proposalCount,
+            fixedBudget: job.fixedBudget,
+            hourlyMin: job.hourlyMin,
+            hourlyMax: job.hourlyMax,
+            clientRating: job.clientRating,
+            clientReviewCount: job.clientReviewCount,
+            clientTotalSpent: job.clientTotalSpent,
+          });
+          passingJobs.push({
+            ...job,
+            score,
+            matchedKeywords: evaluation.matchedKeywords,
+          });
+        } else {
+          this.logger.debug(
+            `Job ${job.upworkJobId} rejected: ${evaluation.rejectionReason}`,
+          );
+          rejectedJobs.push({
+            ...job,
+            rejectionReason: evaluation.rejectionReason ?? 'Unknown reason',
+          });
+        }
+      }
+
+      // Step 5: Dedupe and persistence
+      const candidateIds = passingJobs.map((j) => j.upworkJobId);
+      const existingPassing =
+        candidateIds.length > 0
+          ? await this.prisma.upworkJob.findMany({
+              where: { upworkJobId: { in: candidateIds } },
+              select: { upworkJobId: true },
+            })
+          : [];
+      const existingPassingIds = new Set(
+        existingPassing.map((e) => e.upworkJobId),
+      );
+      const newlyInserted = passingJobs.filter(
+        (j) => !existingPassingIds.has(j.upworkJobId),
+      );
+
+      // Persist passing jobs
+      if (passingJobs.length > 0) {
+        await this.prisma.upworkJob.createMany({
+          data: passingJobs.map((j) => ({
+            upworkJobId: j.upworkJobId,
+            sourceJobId: j.sourceJobId,
+            title: j.title,
+            description: j.description,
+            url: j.url,
+            postedAt: j.postedAt,
+            publishedAt: j.publishedAt,
+            paymentVerified: j.paymentVerified,
+            country: j.country,
+            countryCode: j.countryCode,
+            proposalCount: j.proposalCount,
+            skills: j.skills,
+            jobType: j.jobType,
+            fixedBudget: j.fixedBudget,
+            hourlyMin: j.hourlyMin,
+            hourlyMax: j.hourlyMax,
+            budgetCurrency: j.budgetCurrency,
+            budgetText: j.budgetText,
+            clientRating: j.clientRating,
+            clientReviewCount: j.clientReviewCount,
+            clientTotalSpent: j.clientTotalSpent,
+            changeType: j.changeType,
+            isRepost: j.isRepost,
+            score: j.score,
+            matchedKeywords: j.matchedKeywords,
+            rejectionReason: null,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      // Persist rejected jobs for dashboard visibility
+      if (rejectedJobs.length > 0) {
+        await this.prisma.upworkJob.createMany({
+          data: rejectedJobs.map((j) => ({
+            upworkJobId: j.upworkJobId,
+            sourceJobId: j.sourceJobId,
+            title: j.title,
+            description: j.description,
+            url: j.url,
+            postedAt: j.postedAt,
+            publishedAt: j.publishedAt,
+            paymentVerified: j.paymentVerified,
+            country: j.country,
+            countryCode: j.countryCode,
+            proposalCount: j.proposalCount,
+            skills: j.skills,
+            jobType: j.jobType,
+            fixedBudget: j.fixedBudget,
+            hourlyMin: j.hourlyMin,
+            hourlyMax: j.hourlyMax,
+            budgetCurrency: j.budgetCurrency,
+            budgetText: j.budgetText,
+            clientRating: j.clientRating,
+            clientReviewCount: j.clientReviewCount,
+            clientTotalSpent: j.clientTotalSpent,
+            changeType: j.changeType,
+            isRepost: j.isRepost,
+            score: 0,
+            matchedKeywords: [],
+            rejectionReason: j.rejectionReason,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      // Step 6 & 7: Slack delivery for newly inserted qualifying jobs
+      const slackCandidates = newlyInserted.filter((j) => j.score >= minScore);
+
+      let sentCount = 0;
+      if (slackCandidates.length > 0) {
+        for (const candidate of slackCandidates) {
+          const ok = await this.slackThreadService.sendBlackfalconJobToWebhook({
+            title: candidate.title,
+            url: candidate.url,
+            score: candidate.score,
+            budgetText: candidate.budgetText,
+            country: candidate.country,
+            countryCode: candidate.countryCode,
+            proposalCount: candidate.proposalCount,
+            matchedKeywords: candidate.matchedKeywords,
+            postedAt: candidate.postedAt,
+          });
+
+          if (ok) {
+            await this.prisma.upworkJob.updateMany({
+              where: { upworkJobId: candidate.upworkJobId },
+              data: { slackSentAt: new Date() },
+            });
+            sentCount++;
+          }
+        }
+      }
+
+      // Step 7: Log one summary line per run
+      this.logger.log(
+        `Poll complete (${trigger}): fetched=${totalFetched}, inserted=${newlyInserted.length}, rejected=${rejectedJobs.length}, sent=${sentCount}`,
+      );
+
+      return {
+        fetched: totalFetched,
+        inserted: newlyInserted.length,
+        rejected: rejectedJobs.length,
+        sent: sentCount,
+      };
+    } finally {
+      this.isPolling = false;
+    }
+  }
 
   async listJobs() {
     try {
@@ -83,11 +272,20 @@ export class UpworkJobsService {
             take: 1,
           },
         },
-        orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { postedAt: 'desc' },
+          { publishedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
       });
 
       return rows.map(({ proposalDrafts, ...job }) => ({
         ...job,
+        status: job.slackSentAt
+          ? 'sent'
+          : job.rejectionReason
+            ? 'rejected'
+            : 'pending',
         latestProposal: proposalDrafts[0] ?? null,
       }));
     } catch (error) {
@@ -198,348 +396,6 @@ export class UpworkJobsService {
         query.skills_match_mode?.trim() ||
         envStr('UPWORK_CRON_SKILLS_MATCH_MODE', 'all'),
     };
-  }
-
-  /** Already-applied jobs, jobs in India, jobs with invites sent or 50+ proposals, and jobs failing quality/fit filters are not stored. */
-  private static shouldExcludeUpworkJob(
-    job: UpworkApiJob,
-    preferences: FetchUpworkJobsQueryDto,
-  ): boolean {
-    return UpworkJobsService.rejectionReason(job, preferences) !== null;
-  }
-
-  private static rejectionReason(
-    job: UpworkApiJob,
-    preferences: FetchUpworkJobsQueryDto,
-  ): string | null {
-    const semantic = calculateSemanticFit(job.title, job.description);
-    if (job.applied === true) {
-      return 'already applied';
-    }
-    if (UpworkJobsService.locationIsIndia(job.location)) {
-      return 'excluded location';
-    }
-    if (UpworkJobsService.hasPositiveInvitesSent(job.invites_sent)) {
-      return 'invites already sent';
-    }
-    if (UpworkJobsService.proposalsIndicateFiftyOrMore(job.proposals)) {
-      return '50+ proposals';
-    }
-    if (semantic.disqualified) {
-      return 'disqualifying keywords';
-    }
-    if (!UpworkJobsService.matchesBudgetPreferences(job, preferences)) {
-      return 'outside budget preferences';
-    }
-    if (UpworkJobsService.hasZeroClientHistory(job)) {
-      return 'no client spend or reviews';
-    }
-    if (!UpworkJobsService.matchesKeywordTargeting(job, preferences)) {
-      return 'no skill/keyword match';
-    }
-    return null;
-  }
-
-  /**
-   * smart_search does not accept query/skills params, so keyword/skill
-   * targeting from UPWORK_CRON_Q / UPWORK_CRON_SKILLS is applied here
-   * instead. OR match: keep the job if ANY target term appears in its
-   * title, description, or skills list. If no target terms are configured,
-   * nothing is filtered.
-   */
-  private static matchesKeywordTargeting(
-    job: UpworkApiJob,
-    preferences: FetchUpworkJobsQueryDto,
-  ): boolean {
-    const terms = [
-      ...(preferences.q ?? '').split('|'),
-      ...(preferences.skills ?? '').split('|'),
-    ]
-      .map((term) => term.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (!terms.length) {
-      return true;
-    }
-
-    const haystack = [
-      job.title ?? '',
-      job.description ?? '',
-      ...(Array.isArray(job.skills) ? job.skills : []),
-    ]
-      .join(' ')
-      .toLowerCase();
-
-    return terms.some((term) => haystack.includes(term));
-  }
-
-  private static matchesBudgetPreferences(
-    job: UpworkApiJob,
-    preferences: FetchUpworkJobsQueryDto,
-  ): boolean {
-    const bt = job.budget_type?.trim().toLowerCase();
-    if (bt === 'fixed') {
-      if (!job.budget_total_usd?.trim()) return true;
-      const n = Number((job.budget_total_usd ?? '').replace(/[$,\s]/g, ''));
-      if (!Number.isFinite(n)) return true;
-      if (preferences.fixed_min_usd != null && n < preferences.fixed_min_usd) {
-        return false;
-      }
-      if (preferences.fixed_max_usd != null && n > preferences.fixed_max_usd) {
-        return false;
-      }
-    }
-    if (bt === 'hourly') {
-      const min =
-        typeof job.hourly_min_usd === 'number' ? job.hourly_min_usd : null;
-      const max =
-        typeof job.hourly_max_usd === 'number' ? job.hourly_max_usd : null;
-      if (
-        preferences.hourly_min_usd != null &&
-        max != null &&
-        max < preferences.hourly_min_usd
-      ) {
-        return false;
-      }
-      if (
-        preferences.hourly_max_usd != null &&
-        min != null &&
-        min > preferences.hourly_max_usd
-      ) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private static hasZeroClientHistory(job: UpworkApiJob): boolean {
-    if (
-      job.client_spent === undefined ||
-      typeof job.client_feedback_count !== 'number'
-    ) {
-      return false;
-    }
-    const spent = Number(job.client_spent.replace(/[$,\s]/g, ''));
-    return !Number.isNaN(spent) && spent <= 0 && job.client_feedback_count <= 0;
-  }
-
-  private static locationIsIndia(location: string | undefined): boolean {
-    if (!location?.trim()) {
-      return false;
-    }
-    return location
-      .split(',')
-      .some((part) => part.trim().toLowerCase() === 'india');
-  }
-
-  private static hasPositiveInvitesSent(
-    invites: string | number | undefined | null,
-  ): boolean {
-    if (invites === undefined || invites === null) {
-      return false;
-    }
-    const s = String(invites).trim();
-    if (s === '') {
-      return false;
-    }
-    const n = Number(s);
-    if (!Number.isNaN(n)) {
-      return n > 0;
-    }
-    return s !== '0';
-  }
-
-  /**
-   * Upwork returns human-readable buckets (e.g. "20 to 50", "Less than 5").
-   * Exclude when the range implies **50 or more** proposals.
-   */
-  private static proposalsIndicateFiftyOrMore(
-    proposals: string | undefined,
-  ): boolean {
-    if (!proposals?.trim()) {
-      return false;
-    }
-    const s = proposals.trim().toLowerCase();
-
-    const lessThan = s.match(/less than (\d+)/);
-    if (lessThan) {
-      return Number(lessThan[1]) > 50;
-    }
-
-    const between = s.match(/(\d+)\s*to\s*(\d+)/);
-    if (between) {
-      const hi = Math.max(Number(between[1]), Number(between[2]));
-      return hi >= 50;
-    }
-
-    const plus = s.match(/(\d+)\s*\+/);
-    if (plus) {
-      return Number(plus[1]) >= 50;
-    }
-
-    const moreThan = s.match(/more than (\d+)/);
-    if (moreThan) {
-      return Number(moreThan[1]) >= 50;
-    }
-
-    const digits = s.match(/\d+/g)?.map(Number) ?? [];
-    if (digits.length) {
-      return Math.max(...digits) >= 50;
-    }
-
-    return false;
-  }
-
-  private normalizeJob(
-    job: UpworkApiJob,
-  ): Prisma.UpworkJobCreateManyInput | null {
-    const sourceJobId = job.job_id?.trim();
-    const url = job.url?.trim();
-    const title = job.title?.trim();
-    const description = job.description?.trim();
-
-    if (!sourceJobId || !url || !title || description === undefined) {
-      return null;
-    }
-
-    const publishedAt = job.published_at
-      ? new Date(job.published_at)
-      : undefined;
-
-    const skills =
-      Array.isArray(job.skills) && job.skills.length
-        ? (job.skills as Prisma.InputJsonValue)
-        : undefined;
-
-    const budgetType = job.budget_type?.trim() || null;
-    let hourlyMinUsd =
-      typeof job.hourly_min_usd === 'number'
-        ? Math.round(job.hourly_min_usd)
-        : null;
-    let hourlyMaxUsd =
-      typeof job.hourly_max_usd === 'number'
-        ? Math.round(job.hourly_max_usd)
-        : null;
-
-    if (
-      budgetType?.toLowerCase() === 'hourly' &&
-      (hourlyMinUsd === null || hourlyMaxUsd === null)
-    ) {
-      const fromText =
-        UpworkJobsService.extractHourlyRangeFromDescription(description);
-      if (fromText) {
-        hourlyMinUsd = hourlyMinUsd ?? fromText.min;
-        hourlyMaxUsd = hourlyMaxUsd ?? fromText.max;
-      }
-    }
-
-    const scoreInput: UpworkJobScoreInput = {
-      budgetTotalUsd: job.budget_total_usd?.trim() || null,
-      budgetType,
-      clientFeedbackCount:
-        typeof job.client_feedback_count === 'number'
-          ? job.client_feedback_count
-          : null,
-      clientMemberSince: job.client_member_since?.trim() || null,
-      clientScore:
-        typeof job.client_score === 'number' ? job.client_score : null,
-      clientSpent: job.client_spent?.trim() || null,
-      description,
-      hourlyMaxUsd,
-      hourlyMinUsd,
-      hoursPerWeek: job.hours_per_week?.trim() || null,
-      premium: Boolean(job.premium),
-      proposals: job.proposals?.trim() || null,
-      publishedAt:
-        publishedAt && !Number.isNaN(publishedAt.getTime())
-          ? publishedAt
-          : null,
-      title,
-    };
-
-    const semantic = calculateSemanticFit(title, description);
-    const detected = detectProposalTemplate(title, description);
-    const priority = scoreUpworkJobRecord(scoreInput);
-
-    return {
-      budgetTotalUsd: scoreInput.budgetTotalUsd,
-      budgetType,
-      categoryGroupName: job.category_group_name?.trim() || null,
-      categoryName: job.category_name?.trim() || null,
-      clientActiveHires:
-        typeof job.client_active_hires === 'number'
-          ? job.client_active_hires
-          : null,
-      clientCompanySize: job.client_company_size?.trim() || null,
-      clientFeedbackCount: scoreInput.clientFeedbackCount,
-      clientMemberSince: scoreInput.clientMemberSince,
-      clientScore: scoreInput.clientScore,
-      clientSpent: scoreInput.clientSpent,
-      clientTotalHires:
-        typeof job.client_total_hires === 'number'
-          ? job.client_total_hires
-          : null,
-      description,
-      detectedTemplate: detected.templateId,
-      detectedTemplateName: detected.templateName,
-      disqualified: semantic.disqualified,
-      disqualifiedBy: semantic.disqualifiedBy,
-      experienceLevel: job.experience_level?.trim() || null,
-      hourlyMaxUsd,
-      hourlyMinUsd,
-      hoursPerWeek: scoreInput.hoursPerWeek,
-      invitesSent:
-        job.invites_sent === undefined || job.invites_sent === null
-          ? null
-          : String(job.invites_sent).trim() || null,
-      interviewing:
-        job.interviewing === undefined || job.interviewing === null
-          ? null
-          : String(job.interviewing).trim() || null,
-      isContractToHire: job.is_contract_to_hire ?? null,
-      isEnterprise: job.is_enterprise ?? null,
-      location: job.location?.trim() || null,
-      matchedKeywords: semantic.matchedKeywords,
-      openCount: typeof job.open_count === 'number' ? job.open_count : null,
-      premium: scoreInput.premium ?? false,
-      projectLength: job.project_length?.trim() || null,
-      proposals: scoreInput.proposals,
-      publishedAt: scoreInput.publishedAt ?? null,
-      semanticFitScore: semantic.score,
-      skills: skills ?? undefined,
-      sourceJobId,
-      title,
-      totalJobsWithHires:
-        typeof job.total_jobs_with_hires === 'number'
-          ? job.total_jobs_with_hires
-          : null,
-      urgency: priority.urgency,
-      url,
-    };
-  }
-
-  /** Parse common "$15-25/hr" patterns from Upwork descriptions when the API omits structured hourly fields. */
-  private static extractHourlyRangeFromDescription(
-    text: string,
-  ): { max: number; min: number } | null {
-    const patterns = [
-      /\$\s*(\d+(?:\.\d+)?)\s*[-–—]\s*\$?\s*(\d+(?:\.\d+)?)\s*\/?\s*hr\b/i,
-      /Rate:\s*\$?\s*(\d+(?:\.\d+)?)\s*[-–—]\s*\$?\s*(\d+(?:\.\d+)?)\s*\/?\s*hr/i,
-      /\$\s*(\d+(?:\.\d+)?)\s*[-–—]\s*\$?\s*(\d+(?:\.\d+)?)\s+per\s+hour\b/i,
-    ];
-
-    for (const re of patterns) {
-      const match = text.match(re);
-      if (match) {
-        const min = Math.round(Number(match[1]));
-        const max = Math.round(Number(match[2]));
-        if (!Number.isNaN(min) && !Number.isNaN(max)) {
-          return { max, min };
-        }
-      }
-    }
-
-    return null;
   }
 
   private throwIfTableMissing(error: unknown): never {

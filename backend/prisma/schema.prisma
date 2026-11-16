@@ -29,52 +29,74 @@ model Lead {
 }
 
 model UpworkJob {
-  id                  String    @id @default(uuid()) @db.Uuid
-  sourceJobId         String    @unique
-  url                 String
-  title               String
-  description         String    @db.Text
-  publishedAt         DateTime?
-  skills              Json?
-  budgetType          String?
-  budgetTotalUsd      String?
-  hourlyMinUsd        Int?
-  hourlyMaxUsd        Int?
-  experienceLevel     String?
-  location            String?
-  projectLength       String?
-  hoursPerWeek        String?
-  proposals           String?
-  interviewing        String?
-  invitesSent         String?
-  categoryName        String?
-  categoryGroupName   String?
-  clientTotalHires    Int?
-  clientActiveHires   Int?
-  clientSpent         String?
-  clientMemberSince   String?
-  clientCompanySize   String?
-  clientScore         Float?
-  clientFeedbackCount Int?
-  premium             Boolean   @default(false)
-  totalJobsWithHires  Int?
-  openCount           Int?
-  isContractToHire    Boolean?
-  isEnterprise        Boolean?
-  semanticFitScore    Int?
-  matchedKeywords     String[]  @default([])
-  disqualified        Boolean   @default(false)
-  disqualifiedBy      String[]  @default([])
-  detectedTemplate    Int?
+  id                   String    @id @default(uuid()) @db.Uuid
+  sourceJobId          String?   @unique
+  upworkJobId          String?   @unique
+  url                  String
+  title                String
+  description          String?   @db.Text
+  postedAt             DateTime?
+  publishedAt          DateTime?
+  skills               Json?
+  jobType              String?
+  budgetType           String?
+  budgetText           String?
+  budgetTotalUsd       String?
+  hourlyMin            Float?
+  hourlyMax            Float?
+  hourlyMinUsd         Int?
+  hourlyMaxUsd         Int?
+  fixedBudget          Float?
+  budgetCurrency       String?
+  experienceLevel      String?
+  country              String?
+  countryCode          String?
+  location             String?
+  paymentVerified      Boolean?
+  proposalCount        Int?
+  projectLength        String?
+  hoursPerWeek         String?
+  proposals            String?
+  interviewing         String?
+  invitesSent          String?
+  categoryName         String?
+  categoryGroupName    String?
+  clientTotalHires     Int?
+  clientActiveHires    Int?
+  clientSpent          String?
+  clientTotalSpent     Float?
+  clientMemberSince    String?
+  clientCompanySize    String?
+  clientScore          Float?
+  clientRating         Float?
+  clientFeedbackCount  Int?
+  clientReviewCount    Int?
+  premium              Boolean   @default(false)
+  totalJobsWithHires   Int?
+  openCount            Int?
+  isContractToHire     Boolean?
+  isEnterprise         Boolean?
+  semanticFitScore     Int?
+  score                Int?
+  matchedKeywords      String[]  @default([])
+  disqualified         Boolean   @default(false)
+  disqualifiedBy       String[]  @default([])
+  detectedTemplate     Int?
   detectedTemplateName String?
-  urgency             String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  urgency              String?
+  changeType           String?
+  isRepost             Boolean?  @default(false)
+  slackSentAt          DateTime?
+  rejectionReason      String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  proposalDrafts        UpworkProposalDraft[]
+  proposalDrafts      UpworkProposalDraft[]
   slackUpworkMessages SlackUpworkJobMessage[]
 
   @@index([publishedAt], map: "upwork_job_published_at_idx")
+  @@index([postedAt], map: "upwork_job_posted_at_idx")
+  @@index([upworkJobId], map: "upwork_job_upwork_job_id_idx")
   @@map("upwork_jobs")
 }
 

@@ -161,5 +161,7 @@ export function validateEnv(config: Record<string, unknown>) {
     APIFY_MAX_RESULTS: readNumber(config, 'APIFY_MAX_RESULTS', 50),
     UPWORK_POLL_ENABLED: readString(config, 'UPWORK_POLL_ENABLED', 'true'),
     SLACK_MIN_SCORE: readNumber(config, 'SLACK_MIN_SCORE', 40),
+    MIN_FIXED_BUDGET: readNumber(config, 'MIN_FIXED_BUDGET', 1000),
+    MIN_HOURLY_RATE: readNumber(config, 'MIN_HOURLY_RATE', 15),
   };
 }

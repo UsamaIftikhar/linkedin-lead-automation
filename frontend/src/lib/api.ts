@@ -103,6 +103,22 @@ export async function fetchUpworkJobs(params: FetchUpworkJobsParams) {
   return response.data;
 }
 
+export async function pollUpworkJobs(adminToken?: string) {
+  const response = await apiClient.post<{
+    fetched: number;
+    inserted: number;
+    rejected: number;
+    sent: number;
+  }>(
+    '/upwork/poll',
+    {},
+    {
+      headers: adminToken ? { 'x-admin-token': adminToken } : {},
+    },
+  );
+  return response.data;
+}
+
 export async function sendChatMessages(messages: ChatMessage[]) {
   const response = await apiClient.post<ChatCompleteResponse>('/chat', {
     messages,
