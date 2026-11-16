@@ -154,18 +154,6 @@ export interface FetchUpworkJobsResult {
   totalFromApi: number;
 }
 
-export interface UpworkMcpStatus {
-  configured: boolean;
-  connected: boolean;
-  serverUrl: string;
-}
-
-export interface UpworkMcpConnectResult {
-  authorizationUrl: string | null;
-  connected: boolean;
-  toolNames: string[];
-}
-
 export interface GenerateUpworkProposalResponse {
   draftId: string;
   /** OpenRouter model id used for `POST .../chat/completions`. */

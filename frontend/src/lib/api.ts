@@ -13,8 +13,6 @@ import {
   SendOneEmailResponse,
   SendEmailsResponse,
   UpworkJob,
-  UpworkMcpConnectResult,
-  UpworkMcpStatus,
 } from '@/types/api';
 
 const apiClient = axios.create({
@@ -101,20 +99,6 @@ export async function fetchUpworkJobs(params: FetchUpworkJobsParams) {
         next_cursor: params.next_cursor || undefined,
       },
     },
-  );
-  return response.data;
-}
-
-export async function getUpworkMcpStatus() {
-  const response = await apiClient.get<UpworkMcpStatus>(
-    '/upwork-jobs/mcp/status',
-  );
-  return response.data;
-}
-
-export async function connectUpworkMcp() {
-  const response = await apiClient.post<UpworkMcpConnectResult>(
-    '/upwork-jobs/mcp/connect',
   );
   return response.data;
 }

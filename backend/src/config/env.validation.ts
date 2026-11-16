@@ -60,24 +60,6 @@ export function validateEnv(config: Record<string, unknown>) {
       'https://jsearch.p.rapidapi.com/search',
     ),
     UPWORK_CRON_SECRET: readString(config, 'UPWORK_CRON_SECRET'),
-    UPWORK_MCP_URL: readString(
-      config,
-      'UPWORK_MCP_URL',
-      'https://mcp.upwork.com/mcp',
-    ),
-    UPWORK_MCP_REDIRECT_URI: readString(config, 'UPWORK_MCP_REDIRECT_URI'),
-    UPWORK_MCP_SUCCESS_REDIRECT_URI: readString(
-      config,
-      'UPWORK_MCP_SUCCESS_REDIRECT_URI',
-    ),
-    UPWORK_MCP_CREDENTIALS_ENCRYPTION_KEY: readString(
-      config,
-      'UPWORK_MCP_CREDENTIALS_ENCRYPTION_KEY',
-    ),
-    UPWORK_MCP_JOB_SEARCH_TOOL: readString(
-      config,
-      'UPWORK_MCP_JOB_SEARCH_TOOL',
-    ),
     UPWORK_CRON_Q: readString(config, 'UPWORK_CRON_Q'),
     UPWORK_CRON_SKILLS: readString(config, 'UPWORK_CRON_SKILLS'),
     UPWORK_CRON_SKILLS_MATCH_MODE: readString(

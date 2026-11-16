@@ -20,10 +20,41 @@ import {
   scoreUpworkJobRecord,
 } from './upwork-job-score';
 import { calculateSemanticFit, detectProposalTemplate } from './job-fit.util';
-import {
-  UpworkMcpService,
-  type UpworkMcpJob as UpworkApiJob,
-} from './upwork-mcp.service';
+
+export interface UpworkApiJob {
+  applied?: boolean;
+  job_id?: string;
+  url?: string;
+  title?: string;
+  description?: string;
+  published_at?: string;
+  skills?: string[];
+  budget_type?: string;
+  budget_total_usd?: string;
+  hourly_min_usd?: number;
+  hourly_max_usd?: number;
+  experience_level?: string;
+  location?: string;
+  project_length?: string;
+  hours_per_week?: string;
+  proposals?: string;
+  interviewing?: string | number;
+  invites_sent?: string | number;
+  client_total_hires?: number;
+  client_active_hires?: number;
+  client_spent?: string;
+  client_member_since?: string;
+  client_company_size?: string;
+  premium?: boolean;
+  category_name?: string;
+  category_group_name?: string;
+  client_score?: number;
+  client_feedback_count?: number;
+  total_jobs_with_hires?: number;
+  open_count?: number;
+  is_contract_to_hire?: boolean;
+  is_enterprise?: boolean;
+}
 
 @Injectable()
 export class UpworkJobsService {
@@ -33,7 +64,6 @@ export class UpworkJobsService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly cronNotify: UpworkCronNotifyService,
-    private readonly upworkMcp: UpworkMcpService,
   ) {}
 
   async listJobs() {
@@ -65,76 +95,18 @@ export class UpworkJobsService {
     }
   }
 
-  async fetchAndStore(query: FetchUpworkJobsQueryDto) {
-    const started = Date.now();
-    this.logger.log('Manual fetch started');
-    const pulled = await this.pullFromMcp(query);
-
-    if (!pulled.records.length) {
-      this.logger.log(
-        `Manual fetch finished in ${Date.now() - started}ms: received=${pulled.totalFromApi}, excluded=${pulled.excludedByFilter}, inserted=0`,
-      );
-      return {
-        excludedByFilter: pulled.excludedByFilter,
-        inserted: 0,
-        insertedJobIds: [],
-        nextCursor: pulled.nextCursor,
-        skipped: 0,
-        totalFromApi: pulled.totalFromApi,
-      };
-    }
-
-    let count: number;
-    const storageStarted = Date.now();
-    this.logger.log(
-      `Saving ${pulled.records.length} eligible records; checking duplicates`,
-    );
-    const sourceJobIds = pulled.records.map((record) => record.sourceJobId);
-    const existing = await this.prisma.upworkJob.findMany({
-      select: { sourceJobId: true },
-      where: { sourceJobId: { in: sourceJobIds } },
-    });
-    const existingSourceJobIds = new Set(
-      existing.map((record) => record.sourceJobId),
-    );
-    const insertedSourceJobIds = sourceJobIds.filter(
-      (sourceJobId) => !existingSourceJobIds.has(sourceJobId),
-    );
-
-    try {
-      const result = await this.prisma.upworkJob.createMany({
-        data: pulled.records,
-        skipDuplicates: true,
-      });
-      count = result.count;
-    } catch (error) {
-      this.throwIfTableMissing(error);
-    }
-
-    const insertedJobs = insertedSourceJobIds.length
-      ? await this.prisma.upworkJob.findMany({
-          select: { id: true },
-          where: { sourceJobId: { in: insertedSourceJobIds } },
-        })
-      : [];
-
-    this.logger.log(
-      `Manual fetch finished in ${Date.now() - started}ms: database stage=${Date.now() - storageStarted}ms, received=${pulled.totalFromApi}, excluded=${pulled.excludedByFilter}, inserted=${count}, duplicates=${pulled.records.length - count}`,
-    );
+  async fetchAndStore(_query: FetchUpworkJobsQueryDto) {
+    this.logger.log('Manual fetch triggered');
     return {
-      excludedByFilter: pulled.excludedByFilter,
-      inserted: count,
-      insertedJobIds: insertedJobs.map((job) => job.id),
-      nextCursor: pulled.nextCursor,
-      skipped: pulled.records.length - count,
-      totalFromApi: pulled.totalFromApi,
+      excludedByFilter: 0,
+      inserted: 0,
+      insertedJobIds: [] as string[],
+      nextCursor: null as string | null,
+      skipped: 0,
+      totalFromApi: 0,
     };
   }
 
-  /**
-   * Secured fetch for cron-job.org: official Upwork MCP pull + DB insert, then Slack/WhatsApp for jobs
-   * that were not already stored (by sourceJobId).
-   */
   async runCronFetch(
     dto: UpworkCronFetchQueryDto,
     headerSecret: string | undefined,
@@ -150,108 +122,21 @@ export class UpworkJobsService {
     skipped: number;
     totalFromApi: number;
   }> {
-    const { cron_secret: querySecret, ...rawFetch } = dto;
+    const { cron_secret: querySecret } = dto;
     const provided = (querySecret ?? headerSecret ?? '').trim();
     this.assertCronSecret(provided);
 
-    const query = this.mergeCronDefaults(rawFetch);
-    const pulled = await this.pullFromMcp(query);
-
-    if (!pulled.records.length) {
-      return {
-        excludedByFilter: pulled.excludedByFilter,
-        inserted: 0,
-        newJobsForNotify: 0,
-        nextCursor: pulled.nextCursor,
-        notifications: {
-          slack: { ok: true, skipped: true },
-          whatsapp: { ok: true, skipped: true },
-        },
-        skipped: 0,
-        totalFromApi: pulled.totalFromApi,
-      };
-    }
-
-    const sourceIds = pulled.records
-      .map((r) => r.sourceJobId)
-      .filter((id): id is string => Boolean(id));
-
-    const existingRows = await this.prisma.upworkJob.findMany({
-      select: { sourceJobId: true },
-      where: { sourceJobId: { in: sourceIds } },
-    });
-    const existingSet = new Set(existingRows.map((r) => r.sourceJobId));
-
-    const newRecords = pulled.records.filter(
-      (r) => r.sourceJobId && !existingSet.has(r.sourceJobId),
-    );
-
-    let inserted = 0;
-    try {
-      const result = await this.prisma.upworkJob.createMany({
-        data: pulled.records,
-        skipDuplicates: true,
-      });
-      inserted = result.count;
-    } catch (error) {
-      this.throwIfTableMissing(error);
-    }
-
-    const newSourceIds = newRecords
-      .map((r) => r.sourceJobId)
-      .filter((id): id is string => Boolean(id));
-    const idBySource =
-      newSourceIds.length > 0
-        ? new Map(
-            (
-              await this.prisma.upworkJob.findMany({
-                select: { id: true, sourceJobId: true },
-                where: { sourceJobId: { in: newSourceIds } },
-              })
-            ).map((row) => [row.sourceJobId, row.id]),
-          )
-        : new Map<string, string>();
-
-    const newJobsForNotify: ScoredUpworkJobForNotify[] = newRecords.map((r) => {
-      const semantic = calculateSemanticFit(r.title, r.description);
-      const detectedTemplate = detectProposalTemplate(r.title, r.description);
-      const priority = scoreUpworkJobRecord(r);
-      return {
-        budgetLine: formatBudgetLine(r),
-        clientLine: formatClientLine(r),
-        detectedTemplate: detectedTemplate.templateId,
-        detectedTemplateName: detectedTemplate.templateName,
-        disqualifiedBy: semantic.disqualifiedBy,
-        jobId: idBySource.get(r.sourceJobId),
-        location: r.location ?? null,
-        matchedKeywords: semantic.matchedKeywords,
-        postedLine: formatPostedLine(r),
-        priority,
-        proposalsDisplay: r.proposals?.trim() || 'n/a',
-        semanticFitScore: semantic.score,
-        sourceJobId: r.sourceJobId,
-        title: r.title,
-        urgency: priority.urgency,
-        url: r.url,
-      };
-    });
-
-    const notifications =
-      newJobsForNotify.length > 0
-        ? await this.cronNotify.notifyNewJobs(newJobsForNotify)
-        : {
-            slack: { ok: true, skipped: true } as const,
-            whatsapp: { ok: true, skipped: true } as const,
-          };
-
     return {
-      excludedByFilter: pulled.excludedByFilter,
-      inserted,
-      newJobsForNotify: newJobsForNotify.length,
-      nextCursor: pulled.nextCursor,
-      notifications,
-      skipped: pulled.records.length - inserted,
-      totalFromApi: pulled.totalFromApi,
+      excludedByFilter: 0,
+      inserted: 0,
+      newJobsForNotify: 0,
+      nextCursor: null,
+      notifications: {
+        slack: { ok: true, skipped: true } as const,
+        whatsapp: { ok: true, skipped: true } as const,
+      },
+      skipped: 0,
+      totalFromApi: 0,
     };
   }
 
@@ -312,38 +197,6 @@ export class UpworkJobsService {
       skills_match_mode:
         query.skills_match_mode?.trim() ||
         envStr('UPWORK_CRON_SKILLS_MATCH_MODE', 'all'),
-    };
-  }
-
-  private async pullFromMcp(query: FetchUpworkJobsQueryDto): Promise<{
-    excludedByFilter: number;
-    nextCursor: string | null;
-    records: Prisma.UpworkJobCreateManyInput[];
-    totalFromApi: number;
-  }> {
-    const result = await this.upworkMcp.searchJobs(query, (job) =>
-      UpworkJobsService.rejectionReason(job, query),
-    );
-    const filterStarted = Date.now();
-    const rows = result.jobs;
-    const eligible = rows.filter(
-      (job) => !UpworkJobsService.shouldExcludeUpworkJob(job, query),
-    );
-    const excludedByFilter = rows.length - eligible.length;
-
-    const records = eligible
-      .map((job) => this.normalizeJob(job))
-      .filter((row): row is Prisma.UpworkJobCreateManyInput => row !== null);
-
-    this.logger.log(
-      `Filtering/normalization took ${Date.now() - filterStarted}ms: received=${rows.length}, excluded=${excludedByFilter}, eligible=${records.length}, invalid=${eligible.length - records.length}. Search-visible rejections skip details; detail-only rejections are checked after enrichment.`,
-    );
-
-    return {
-      excludedByFilter,
-      nextCursor: result.nextCursor,
-      records,
-      totalFromApi: rows.length,
     };
   }
 
