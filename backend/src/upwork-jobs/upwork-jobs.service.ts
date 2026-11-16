@@ -64,6 +64,13 @@ export class UpworkJobsService {
       };
     }
 
+    if (!this.apifyService.hasToken()) {
+      this.logger.warn(
+        `Skipping Upwork poll (${trigger}): APIFY_TOKEN is not configured in environment variables.`,
+      );
+      return { fetched: 0, inserted: 0, rejected: 0, sent: 0 };
+    }
+
     this.isPolling = true;
     try {
       this.logger.log(`Starting Upwork poll (${trigger})...`);

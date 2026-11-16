@@ -38,14 +38,23 @@ export class ApifyService implements OnModuleInit {
       'blackfalcondata/upwork-scraper';
   }
 
+  hasToken(): boolean {
+    return Boolean(this.token);
+  }
+
   onModuleInit() {
     if (!this.token) {
-      this.logger.error('APIFY_TOKEN is missing in environment variables.');
-      throw new Error('APIFY_TOKEN is required.');
+      this.logger.warn(
+        'APIFY_TOKEN is missing in environment variables. Upwork poller will remain idle until APIFY_TOKEN is configured in Render/environment.',
+      );
     }
   }
 
   async runAndFetchJobs(): Promise<MappedUpworkJob[]> {
+    if (!this.token) {
+      this.logger.error('Cannot run Apify scraper: APIFY_TOKEN is missing in environment variables.');
+      throw new Error('APIFY_TOKEN is required.');
+    }
     const input: BlackfalconActorInput = buildBlackfalconActorInput(this.config);
     const actorSlug = this.actorId.replace('/', '~');
     const startUrl = `https://api.apify.com/v2/acts/${encodeURIComponent(actorSlug)}/runs?token=${encodeURIComponent(this.token)}`;

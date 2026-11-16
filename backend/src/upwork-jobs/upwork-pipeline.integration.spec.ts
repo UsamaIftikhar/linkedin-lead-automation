@@ -29,6 +29,7 @@ describe('Upwork Pipeline Integration (Mocked Apify & Slack)', () => {
     };
 
     mockApifyService = {
+      hasToken: jest.fn().mockReturnValue(true),
       runAndFetchJobs: jest.fn(),
     };
 
