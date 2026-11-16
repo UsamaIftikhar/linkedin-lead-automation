@@ -158,9 +158,13 @@ export class ProposalService {
     proposal: string;
     retrievedSummaries: string[];
   }> {
-    const job = await this.prisma.upworkJob.findUnique({
-      where: { id: jobId },
-    });
+    const job =
+      (await this.prisma.upworkJob.findUnique({
+        where: { id: jobId },
+      })) ||
+      (await this.prisma.upworkJob.findUnique({
+        where: { upworkJobId: jobId },
+      }));
 
     if (!job) {
       throw new NotFoundException(`Upwork job ${jobId} not found.`);

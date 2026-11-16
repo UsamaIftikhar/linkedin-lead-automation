@@ -87,6 +87,8 @@ export function buildSingleJobSlackBlocks(
 }
 
 export interface SlackBlackfalconJobPayload {
+  dbId?: string;
+  upworkJobId?: string;
   title: string;
   url: string;
   score: number;
@@ -158,6 +160,15 @@ export function buildBlackfalconSlackBlocks(
           },
           url: job.url,
           action_id: 'view_job_button',
+        },
+      ],
+    },
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '✍️ _Reply in this thread with_ `generate proposal` _to draft a proposal._',
         },
       ],
     },

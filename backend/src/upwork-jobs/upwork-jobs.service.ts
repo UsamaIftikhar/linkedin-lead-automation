@@ -224,7 +224,14 @@ export class UpworkJobsService {
       let sentCount = 0;
       if (slackCandidates.length > 0) {
         for (const candidate of slackCandidates) {
+          const storedJob = await this.prisma.upworkJob.findUnique({
+            where: { upworkJobId: candidate.upworkJobId },
+            select: { id: true },
+          });
+
           const ok = await this.slackThreadService.sendBlackfalconJobToWebhook({
+            dbId: storedJob?.id,
+            upworkJobId: candidate.upworkJobId,
             title: candidate.title,
             url: candidate.url,
             score: candidate.score,

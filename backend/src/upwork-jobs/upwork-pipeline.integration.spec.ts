@@ -40,6 +40,7 @@ describe('Upwork Pipeline Integration (Mocked Apify & Slack)', () => {
     mockPrisma = {
       upworkJob: {
         findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue({ id: 'uuid-123' }),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },

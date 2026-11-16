@@ -515,18 +515,77 @@ export class SlackUpworkThreadService {
   async sendBlackfalconJobToWebhook(
     job: SlackBlackfalconJobPayload,
   ): Promise<boolean> {
+    const token = this.configService.get<string>('SLACK_BOT_TOKEN')?.trim();
+    const channel = this.configService
+      .get<string>('SLACK_UPWORK_CHANNEL_ID')
+      ?.trim();
     const webhookUrl = this.configService
       .get<string>('SLACK_WEBHOOK_URL')
       ?.trim();
+
+    if (!token && !webhookUrl) {
+      this.logger.warn(
+        'Neither SLACK_BOT_TOKEN nor SLACK_WEBHOOK_URL is configured.',
+      );
+      return false;
+    }
+
+    const blocks = buildBlackfalconSlackBlocks(job);
+    const textFallback = `${job.title} · Score: ${job.score}`;
+
+    // Preferred: Post via Bot Token so message_ts is recorded for "generate proposal" thread replies
+    if (token && channel) {
+      try {
+        const res = await axios.post(
+          SLACK_POST_URL,
+          {
+            channel,
+            text: textFallback,
+            blocks,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            timeout: 25_000,
+          },
+        );
+        const data = res.data as {
+          ok?: boolean;
+          error?: string;
+          ts?: string;
+        };
+        if (data.ok && data.ts) {
+          if (job.dbId) {
+            await this.prisma.slackUpworkJobMessage.create({
+              data: {
+                channelId: channel,
+                messageTs: data.ts,
+                upworkJobId: job.dbId,
+              },
+            });
+          }
+          return true;
+        }
+        this.logger.warn(
+          `Slack bot chat.postMessage failed: ${data.error ?? 'unknown'}, falling back to webhook`,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Slack bot post exception: ${msg}, falling back to webhook`,
+        );
+      }
+    }
 
     if (!webhookUrl) {
       this.logger.warn('SLACK_WEBHOOK_URL is not configured.');
       return false;
     }
 
-    const blocks = buildBlackfalconSlackBlocks(job);
     const payload = {
-      text: `${job.title} · Score: ${job.score}`,
+      text: textFallback,
       blocks,
     };
 
@@ -539,6 +598,19 @@ export class SlackUpworkThreadService {
         });
 
         if (response.status === 200) {
+          // If webhook returns ts & channel, record it for thread replies
+          const raw = response.data;
+          if (raw && typeof raw === 'object' && raw.ts && (raw.channel || channel)) {
+            if (job.dbId) {
+              await this.prisma.slackUpworkJobMessage.create({
+                data: {
+                  channelId: raw.channel || channel!,
+                  messageTs: raw.ts,
+                  upworkJobId: job.dbId,
+                },
+              }).catch(() => undefined);
+            }
+          }
           return true;
         }
 
