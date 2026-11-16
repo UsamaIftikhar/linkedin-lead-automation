@@ -217,14 +217,22 @@ export class ProposalService {
     const jobDescription = buildJobDescriptionText(job);
     const { context, summaries } =
       await this.retrievalService.getRelevantContext(jobDescription);
-    const detectedTemplate = detectProposalTemplate(job.title, job.description ?? '');
-    const semanticFit = calculateSemanticFit(job.title, job.description ?? '');
+    const detectedTemplate = detectProposalTemplate(
+      job.title,
+      job.description ?? '',
+      job.skills,
+    );
+    const semanticFit = calculateSemanticFit(
+      job.title,
+      job.description ?? '',
+      job.skills,
+    );
     const { system, user } = buildPrompt({
       context,
       detectedTemplate,
       job: {
-        budget: formatBudgetLine(job),
-        clientLocation: job.location ?? 'Not specified',
+        budget: job.budgetText || formatBudgetLine(job),
+        clientLocation: (job.country || job.location) ?? 'Not specified',
         description: job.description ?? '',
         title: job.title,
       },

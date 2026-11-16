@@ -23,15 +23,22 @@ export type TemplateDetectionResult = {
 function buildText(
   title: string | null | undefined,
   description: string | null | undefined,
+  skills?: unknown,
 ): string {
-  return `${title ?? ''} ${description ?? ''}`.toLowerCase();
+  const skillsStr = Array.isArray(skills)
+    ? skills.filter((s): s is string => typeof s === 'string').join(' ')
+    : typeof skills === 'string'
+    ? skills
+    : '';
+  return `${title ?? ''} ${description ?? ''} ${skillsStr}`.toLowerCase();
 }
 
 export function calculateSemanticFit(
   title: string | null | undefined,
   description: string | null | undefined,
+  skills?: unknown,
 ): SemanticFitResult {
-  const text = buildText(title, description);
+  const text = buildText(title, description, skills);
   const disqualifiedBy = DISQUALIFYING_KEYWORDS.filter((kw) =>
     text.includes(kw),
   );
@@ -60,8 +67,9 @@ export function calculateSemanticFit(
 export function detectProposalTemplate(
   title: string | null | undefined,
   description: string | null | undefined,
+  skills?: unknown,
 ): TemplateDetectionResult {
-  const text = buildText(title, description);
+  const text = buildText(title, description, skills);
   const t1 = TEMPLATE_1_KEYWORDS.filter((kw) => text.includes(kw)).length;
   const t2 = TEMPLATE_2_KEYWORDS.filter((kw) => text.includes(kw)).length;
   const t3 = TEMPLATE_3_KEYWORDS.filter((kw) => text.includes(kw)).length;

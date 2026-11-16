@@ -56,22 +56,22 @@ PROPOSAL RULES (strictly follow all; they must align with the rule above):
 7. Sound like a senior developer, not a salesperson
 8. Tie every technical point to what they actually wrote — no boilerplate advice
 
-TEMPLATE TO FOLLOW BASED ON JOB TYPE:
+TEMPLATE STRUCTURE TO STRICTLY FOLLOW BASED ON SELECTED TEMPLATE:
 
-For AI/Chatbot jobs (Template 1):
-- Open: When Cova is a genuine fit, reference it and how it relates; otherwise lead with their problem and use EverCare/RAG proof if relevant
-- Middle: Explain specific technical approach for their use case
-- End: One smart technical question
+Template 1 (AI Assistant / Chatbot / LLM / RAG):
+• Hook/Open: Lead with their specific AI workflow or problem. Reference Cova (live AI assistant on App Store with DeepSeek transcription, ElevenLabs voice, conversational AI: https://apps.apple.com/us/app/cova/id6748680152) or Mistral RAG application.
+• Middle: Explain the specific technical approach for their use case (prompt engineering, RAG/vector retrieval, streaming completions, or latency optimization).
+• End: ONE smart technical question about their model choice, context data, or AI pipeline.
 
-For SaaS/CRM/Dashboard jobs (Template 2):
-- Open: Reference WattVue or EverCare as relevant proof
-- Middle: Specific suggestion for their project architecture
-- End: One smart question about scope or existing data
+Template 2 (SaaS / CRM / Dashboard / Portal):
+• Hook/Open: Lead with their core business workflow or product goal. Reference WattVue (complete solar energy SaaS with CRM portal + mobile app, live in US: https://wattvue.com) or EverCare platform.
+• Middle: Specific technical suggestion for their project architecture, database design (PostgreSQL/Supabase/Prisma), and API structure.
+• End: ONE smart question about scope, data schema, user roles, or existing integrations.
 
-For Full Stack jobs (Template 3):
-- Open: Specific detail you noticed in their post
-- Middle: Relevant experience + proposed stack
-- End: Ask ONE question specific to their actual technical situation — about their existing codebase, data structure, deployment setup, or timeline. Never ask a generic ownership/collaboration question unless they mentioned it.
+Template 3 (Full Stack Web Development / React / Next.js / Node):
+• Hook/Open: A specific technical detail or architectural requirement noticed in their post.
+• Middle: Relevant full-stack production experience (React, Next.js, TypeScript, Node.js/NestJS) and proposed stack/pattern.
+• End: ONE smart question specific to their actual technical situation (codebase state, API contract, or deployment pipeline).
 
 OUTPUT FORMAT:
 Return only the proposal text. No preamble. No "Here is your proposal:". Just the proposal itself, ready to copy-paste.
@@ -82,14 +82,14 @@ Job Title: ${input.job.title}
 Job Description: ${input.job.description}
 Budget: ${input.job.budget}
 Client Location: ${input.job.clientLocation}
-Template to use: Template ${input.detectedTemplate.templateId} (${input.detectedTemplate.templateName})
+REQUIRED TEMPLATE: Template ${input.detectedTemplate.templateId} (${input.detectedTemplate.templateName})
 Template detection reason: ${input.detectedTemplate.detectionReason}
 Matched keywords: ${input.matchedKeywords.join(', ') || 'none'}
 
 Relevant Experience:
 ${input.context}
 
-Write a proposal for Usama for this specific job.
+Write a proposal for Usama for this specific job following Template ${input.detectedTemplate.templateId} (${input.detectedTemplate.templateName}).
 `.trim();
 
   return { system, user };

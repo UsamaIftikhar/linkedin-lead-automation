@@ -14,6 +14,10 @@ import { ApifyService } from './apify.service';
 import { MappedUpworkJob } from './blackfalcon.mapper';
 import { evaluateJobFilters } from './filters/job-filters';
 import { scoreBlackfalconJob } from './upwork-job-score';
+import {
+  calculateSemanticFit,
+  detectProposalTemplate,
+} from './job-fit.util';
 import { FetchUpworkJobsQueryDto } from './dto/fetch-upwork-jobs-query.dto';
 import type { UpworkCronFetchQueryDto } from './dto/upwork-cron-fetch-query.dto';
 import { UpworkCronNotifyService } from './upwork-cron-notify.service';
@@ -90,7 +94,15 @@ export class UpworkJobsService {
         Number(this.configService.get<number>('SLACK_MIN_SCORE')) || 40;
 
       const passingJobs: Array<
-        MappedUpworkJob & { matchedKeywords: string[]; score: number }
+        MappedUpworkJob & {
+          matchedKeywords: string[];
+          score: number;
+          detectedTemplate: number;
+          detectedTemplateName: string;
+          semanticFitScore: number;
+          semanticKeywords: string[];
+          proposalGuidance: string;
+        }
       > = [];
       const rejectedJobs: Array<
         MappedUpworkJob & { rejectionReason: string }
@@ -116,10 +128,39 @@ export class UpworkJobsService {
             clientReviewCount: job.clientReviewCount,
             clientTotalSpent: job.clientTotalSpent,
           });
+
+          const template = detectProposalTemplate(
+            job.title,
+            job.description,
+            job.skills,
+          );
+          const semantic = calculateSemanticFit(
+            job.title,
+            job.description,
+            job.skills,
+          );
+
+          let proposalGuidance: string;
+          if (score >= 80) {
+            proposalGuidance = `Send immediately — high semantic fit + strong client. Use Template ${template.templateId}. Spend 10-12 connects.`;
+          } else if (score >= 65) {
+            proposalGuidance = `Send within 2 hours — good fit, competitive window open. Use Template ${template.templateId}. Spend 8-10 connects.`;
+          } else if (score >= 45) {
+            proposalGuidance = `Apply if you have connects to spare. Customize Template ${template.templateId} carefully. Spend 6-8 connects.`;
+          } else {
+            proposalGuidance =
+              'Not worth applying — low fit, high competition, or weak client.';
+          }
+
           passingJobs.push({
             ...job,
             score,
             matchedKeywords: evaluation.matchedKeywords,
+            detectedTemplate: template.templateId,
+            detectedTemplateName: template.templateName,
+            semanticFitScore: semantic.score,
+            semanticKeywords: semantic.matchedKeywords,
+            proposalGuidance,
           });
         } else {
           this.logger.debug(
@@ -177,6 +218,9 @@ export class UpworkJobsService {
             isRepost: j.isRepost,
             score: j.score,
             matchedKeywords: j.matchedKeywords,
+            detectedTemplate: j.detectedTemplate,
+            detectedTemplateName: j.detectedTemplateName,
+            semanticFitScore: j.semanticFitScore,
             rejectionReason: null,
           })),
           skipDuplicates: true,
@@ -241,6 +285,14 @@ export class UpworkJobsService {
             proposalCount: candidate.proposalCount,
             matchedKeywords: candidate.matchedKeywords,
             postedAt: candidate.postedAt,
+            proposalGuidance: candidate.proposalGuidance,
+            semanticFitScore: candidate.semanticFitScore,
+            semanticKeywords: candidate.semanticKeywords,
+            detectedTemplate: candidate.detectedTemplate,
+            detectedTemplateName: candidate.detectedTemplateName,
+            clientRating: candidate.clientRating,
+            clientReviewCount: candidate.clientReviewCount,
+            clientTotalSpent: candidate.clientTotalSpent,
           });
 
           if (ok) {

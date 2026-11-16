@@ -159,8 +159,9 @@ export function checkBudget(
   }
 
   if (type === 'HOURLY') {
+    // If client hasn't specified an hourly rate or range on Upwork, do not reject (open to offers / negotiable)
     if (job.hourlyMin === null || job.hourlyMin === undefined) {
-      return { passed: false, reason: 'missing hourly minimum budget' };
+      return { passed: true };
     }
     if (job.hourlyMin <= options.minHourlyRate) {
       return {

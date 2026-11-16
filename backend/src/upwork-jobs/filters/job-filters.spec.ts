@@ -237,13 +237,12 @@ describe('Upwork Job Filters', () => {
       expect(res.passed).toBe(true);
     });
 
-    it('HOURLY: rejects when hourlyMin is null', () => {
+    it('HOURLY: passes when hourlyMin is null (unspecified/open rate)', () => {
       const res = checkBudget(
         { ...baseJob, jobType: 'HOURLY', hourlyMin: null },
         options,
       );
-      expect(res.passed).toBe(false);
-      expect(res.reason).toContain('missing hourly minimum');
+      expect(res.passed).toBe(true);
     });
 
     it('rejects unsupported jobType', () => {

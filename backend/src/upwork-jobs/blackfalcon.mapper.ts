@@ -67,6 +67,9 @@ function formatBudgetText(input: {
   if (input.fixedBudget != null) {
     return `${prefix}${input.fixedBudget}`;
   }
+  if (input.jobType === 'HOURLY') {
+    return 'Hourly (unspecified / open to offers)';
+  }
   return null;
 }
 

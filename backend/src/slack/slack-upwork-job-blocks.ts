@@ -98,16 +98,27 @@ export interface SlackBlackfalconJobPayload {
   proposalCount: number | null;
   matchedKeywords: string[];
   postedAt: Date;
+  proposalGuidance?: string | null;
+  semanticFitScore?: number | null;
+  semanticKeywords?: string[];
+  detectedTemplate?: number | null;
+  detectedTemplateName?: string | null;
+  clientRating?: number | null;
+  clientReviewCount?: number | null;
+  clientTotalSpent?: number | null;
 }
 
 /**
  * Builds Slack Block Kit message per Step 7:
  * - Title linked to url
- * - Score
+ * - Proposal guidance
+ * - Semantic fit & keywords
+ * - Recommended template
+ * - Client rating, review count, total spent
+ * - Opportunity score
  * - Budget
  * - Country
  * - Proposal count
- * - Matched keywords
  * - Posted time
  * - "View job" button
  * - NO contact or social fields
@@ -117,18 +128,49 @@ export function buildBlackfalconSlackBlocks(
 ): Record<string, unknown>[] {
   const link = `<${job.url}|*${escapeSlackLinkLabel(job.title)}*>`;
   const location = job.country || job.countryCode || 'Unknown';
-  const budget = job.budgetText || 'Not specified';
+  const budget = job.budgetText || 'Hourly (unspecified / open to offers)';
   const proposals = job.proposalCount != null ? String(job.proposalCount) : 'Unknown';
-  const keywords = job.matchedKeywords.length ? job.matchedKeywords.join(', ') : 'None';
   const posted = job.postedAt.toUTCString();
+
+  const keywordsList =
+    job.semanticKeywords && job.semanticKeywords.length
+      ? job.semanticKeywords
+      : job.matchedKeywords;
+  const keywordsStr = keywordsList.length ? keywordsList.join(', ') : 'None';
+
+  const guidance =
+    job.proposalGuidance ||
+    (job.score >= 80
+      ? 'Send immediately — high semantic fit + strong client. Spend 10-12 connects.'
+      : job.score >= 65
+      ? 'Send within 2 hours — good fit, competitive window open. Spend 8-10 connects.'
+      : job.score >= 45
+      ? 'Apply if you have connects to spare. Customize template carefully. Spend 6-8 connects.'
+      : 'Not worth applying — low fit, high competition, or weak client.');
+
+  const semanticFitVal =
+    job.semanticFitScore != null ? job.semanticFitScore : job.score;
+  const templateId = job.detectedTemplate ?? 2;
+  const templateName = job.detectedTemplateName ?? 'SaaS / CRM / Dashboard';
+
+  const clientReviews = job.clientReviewCount ?? 0;
+  const clientRating = job.clientRating != null ? job.clientRating : 0;
+  const spentStr =
+    job.clientTotalSpent != null && job.clientTotalSpent > 0
+      ? ` · $${Math.round(job.clientTotalSpent).toLocaleString()} spent`
+      : '';
+  const clientLine = `👤 ⭐ ${clientRating} (${clientReviews} reviews)${spentStr}`;
 
   const textLines = [
     `🎯 ${link}`,
+    `📋 *Proposal guidance:* ${guidance}`,
+    `🎯 *Semantic fit:* ${semanticFitVal}/100 — Keywords: ${keywordsStr}`,
+    `📋 *Recommended template:* Template ${templateId} (${templateName})`,
     `⭐ *Score:* ${job.score}/100`,
     `💰 *Budget:* ${budget}`,
     `📍 *Country:* ${location}`,
     `📊 *Proposals:* ${proposals}`,
-    `🏷️ *Matched Keywords:* ${keywords}`,
+    clientLine,
     `🕐 *Posted Time (UTC):* ${posted}`,
   ].join('\n');
 
