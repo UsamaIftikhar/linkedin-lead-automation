@@ -316,32 +316,27 @@ export class UpworkJobsService {
     dto: UpworkCronFetchQueryDto,
     headerSecret: string | undefined,
   ): Promise<{
-    excludedByFilter: number;
+    status: string;
+    trigger: string;
+    fetched: number;
     inserted: number;
-    newJobsForNotify: number;
-    nextCursor: string | null;
-    notifications: {
-      slack: { detail?: string; ok: boolean; skipped: boolean };
-      whatsapp: { ok: boolean; skipped: boolean };
-    };
-    skipped: number;
-    totalFromApi: number;
+    rejected: number;
+    sentToSlack: number;
+    skippedBecauseBusy: boolean;
   }> {
     const { cron_secret: querySecret } = dto;
     const provided = (querySecret ?? headerSecret ?? '').trim();
     this.assertCronSecret(provided);
 
+    const result = await this.pollAndProcessJobs('cronjob.org');
     return {
-      excludedByFilter: 0,
-      inserted: 0,
-      newJobsForNotify: 0,
-      nextCursor: null,
-      notifications: {
-        slack: { ok: true, skipped: true } as const,
-        whatsapp: { ok: true, skipped: true } as const,
-      },
-      skipped: 0,
-      totalFromApi: 0,
+      status: 'ok',
+      trigger: 'cronjob.org',
+      fetched: result.fetched,
+      inserted: result.inserted,
+      rejected: result.rejected,
+      sentToSlack: result.sent,
+      skippedBecauseBusy: Boolean(result.skippedBecauseBusy),
     };
   }
 

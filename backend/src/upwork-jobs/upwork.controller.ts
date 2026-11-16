@@ -16,6 +16,7 @@ export class UpworkController {
     private readonly upworkJobsService: UpworkJobsService,
   ) {}
 
+  @Get('poll')
   @Post('poll')
   async poll(
     @Headers('x-admin-token') xAdminToken?: string,

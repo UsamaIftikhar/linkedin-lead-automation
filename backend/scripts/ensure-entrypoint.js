@@ -12,3 +12,4 @@ if (fs.existsSync(srcMain) && !fs.existsSync(rootMain)) {
   fs.writeFileSync(srcMain, "require('../main.js');\n");
   console.log('[ensure-entrypoint] Created forwarding dist/src/main.js -> dist/main.js');
 }
+
