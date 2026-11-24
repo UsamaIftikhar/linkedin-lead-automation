@@ -87,7 +87,7 @@ export class UpworkJobsService {
       }
 
       const minFixedBudget =
-        Number(this.configService.get<number>('MIN_FIXED_BUDGET')) || 1000;
+        Number(this.configService.get<number>('MIN_FIXED_BUDGET')) || 300;
       const minHourlyRate =
         Number(this.configService.get<number>('MIN_HOURLY_RATE')) || 15;
       const minScore =

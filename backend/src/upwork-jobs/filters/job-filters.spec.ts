@@ -209,10 +209,9 @@ describe('Upwork Job Filters', () => {
       expect(res.reason).toContain('proposals (20) >= 20');
     });
 
-    it('rejects when proposals is null', () => {
+    it('passes when proposals is null (fresh listing with 0 proposals)', () => {
       const res = checkProposalCount({ ...baseJob, proposalCount: null }, 20);
-      expect(res.passed).toBe(false);
-      expect(res.reason).toContain('missing proposal count');
+      expect(res.passed).toBe(true);
     });
   });
 

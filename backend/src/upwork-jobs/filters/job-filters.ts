@@ -114,13 +114,13 @@ export function checkDeveloperRole(job: MappedUpworkJob): FilterResult {
   return { passed: true };
 }
 
-/** Rule 6: Proposals (reject if proposalCount is null or >= 20) */
+/** Rule 6: Proposals (reject if proposalCount is >= 20; allow null as fresh 0-proposal listing) */
 export function checkProposalCount(
   job: MappedUpworkJob,
   maxProposals = 20,
 ): FilterResult {
   if (job.proposalCount === null || job.proposalCount === undefined) {
-    return { passed: false, reason: 'missing proposal count' };
+    return { passed: true };
   }
   if (job.proposalCount >= maxProposals) {
     return {
