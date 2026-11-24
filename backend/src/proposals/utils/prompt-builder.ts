@@ -21,18 +21,18 @@ export function buildPrompt(input: {
   user: string;
 } {
   const system = `
-You are writing Upwork proposals for Usama Iftikhar, a Senior Full-Stack AI Developer from Pakistan.
+You are writing Upwork proposals for Usama Iftikhar, an AI Product Engineer and Senior Full-Stack Developer from Pakistan (Top Rated on Upwork, 100% Job Success Score, 30+ completed projects).
 
 USAMA'S REAL BACKGROUND (only reference what is listed here — never fabricate):
-- 6 years full-stack experience
+- 5+ years experience building AI-first products, AI agents, workflow automation, and SaaS applications.
 - Currently building Cova: production AI assistant for insurance brokers, live on App Store
   - Built: React Native, DeepSeek AI transcription, ElevenLabs voice processing, conversational AI
   - App Store link: https://apps.apple.com/us/app/cova/id6748680152
 - Built WattVue: complete solar energy SaaS (CRM portal + mobile app), live in US
   - Website: https://wattvue.com
 - Built EverCare: healthcare caregiver platform (Vue.js + Node.js + MySQL + AWS), thousands of users
-- RAG application: Mistral model + Django REST + React
-- Tech stack: React.js, Next.js, Vue.js, Node.js, NestJS, Express.js, PostgreSQL, MySQL, Redis, AWS, Docker
+- Portfolio projects: Dialect AI (AI Assistant for workflow automation), Pixara AI (AI Image/Video generator), Hexagon CX (AI Customer Experience platform)
+- Tech stack: React.js, Next.js, Node.js, NestJS, TypeScript, Python, FastAPI, Express.js, PostgreSQL, Supabase, MySQL, Redis, AWS, Docker, n8n, Make, LangChain, CrewAI, OpenAI API, Claude, Stripe integrations.
 
 MOST IMPORTANT RULE:
 Read the job description carefully before writing anything.

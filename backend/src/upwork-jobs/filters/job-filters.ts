@@ -85,6 +85,35 @@ export function checkLocation(job: MappedUpworkJob): FilterResult {
   return { passed: true };
 }
 
+const FREELANCER_GEO_RESTRICTION_REGEX =
+  /\b(u\.?s\.?\s+only|united states only|us\s+citizens?\s+only|us\s+residents?\s+only|must be (located|based|resident) in (the )?u\.?s|north america only|w2 only|europe only|uk only|latam only)\b/i;
+
+const NON_DEV_TITLE_REGEX =
+  /\b(video editor|video editing|video creation|youtube editor|reels editor|shorts editor|thumbnail designer|copywriter|copywriting|content writer|article writer|blog writer|seo specialist|seo expert|virtual assistant|appointment setter|cold caller|sales rep|telemarketer|graphic designer|logo design|ui\/ux designer only|manual tester|qa tester)\b/i;
+
+/** Rule 5b: Freelancer location restriction (reject if client explicitly restricts to US/Europe/UK/etc.) */
+export function checkFreelancerGeoRestrictions(job: MappedUpworkJob): FilterResult {
+  const combined = `${job.title} ${job.description ?? ''}`;
+  if (FREELANCER_GEO_RESTRICTION_REGEX.test(combined)) {
+    return {
+      passed: false,
+      reason: 'freelancer location restricted (e.g. US/Europe only)',
+    };
+  }
+  return { passed: true };
+}
+
+/** Rule 5c: Developer role verification (reject non-developer titles) */
+export function checkDeveloperRole(job: MappedUpworkJob): FilterResult {
+  if (NON_DEV_TITLE_REGEX.test(job.title)) {
+    return {
+      passed: false,
+      reason: 'non-developer job role title',
+    };
+  }
+  return { passed: true };
+}
+
 /** Rule 6: Proposals (reject if proposalCount is null or >= 20) */
 export function checkProposalCount(
   job: MappedUpworkJob,
@@ -220,6 +249,18 @@ export function evaluateJobFilters(
   const r5 = checkLocation(job);
   if (!r5.passed) {
     return { passed: false, rejectionReason: r5.reason!, matchedKeywords: [] };
+  }
+
+  // 5b. Freelancer location restriction
+  const rGeo = checkFreelancerGeoRestrictions(job);
+  if (!rGeo.passed) {
+    return { passed: false, rejectionReason: rGeo.reason!, matchedKeywords: [] };
+  }
+
+  // 5c. Developer role verification
+  const rRole = checkDeveloperRole(job);
+  if (!rRole.passed) {
+    return { passed: false, rejectionReason: rRole.reason!, matchedKeywords: [] };
   }
 
   // 6. Proposals

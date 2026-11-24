@@ -1,6 +1,8 @@
 import {
   checkBudget,
   checkChangeType,
+  checkDeveloperRole,
+  checkFreelancerGeoRestrictions,
   checkFreshness,
   checkKeywords,
   checkLocation,
@@ -135,6 +137,64 @@ describe('Upwork Job Filters', () => {
       const res = checkLocation({ ...baseJob, country: null, countryCode: null });
       expect(res.passed).toBe(false);
       expect(res.reason).toContain('missing country');
+    });
+  });
+
+  describe('Rule 5b: checkFreelancerGeoRestrictions', () => {
+    it('passes when no geo restrictions are mentioned', () => {
+      const res = checkFreelancerGeoRestrictions(baseJob);
+      expect(res.passed).toBe(true);
+    });
+
+    it('rejects when description specifies "US only"', () => {
+      const res = checkFreelancerGeoRestrictions({
+        ...baseJob,
+        description: 'Great project, but US only applicants please.',
+      });
+      expect(res.passed).toBe(false);
+      expect(res.reason).toContain('freelancer location restricted');
+    });
+
+    it('rejects when description specifies "US citizens only"', () => {
+      const res = checkFreelancerGeoRestrictions({
+        ...baseJob,
+        description: 'Requires clearance. US citizens only.',
+      });
+      expect(res.passed).toBe(false);
+      expect(res.reason).toContain('freelancer location restricted');
+    });
+  });
+
+  describe('Rule 5c: checkDeveloperRole', () => {
+    it('passes when job title is a software developer or engineer', () => {
+      expect(checkDeveloperRole(baseJob).passed).toBe(true);
+    });
+
+    it('rejects non-dev title: Video Editor', () => {
+      const res = checkDeveloperRole({
+        ...baseJob,
+        title: 'Experienced Video Editor for YouTube Channel',
+      });
+      expect(res.passed).toBe(false);
+      expect(res.reason).toContain('non-developer job role title');
+    });
+
+    it('rejects non-dev title: B2B Copywriter', () => {
+      const res = checkDeveloperRole({
+        ...baseJob,
+        title: 'B2B SaaS Content Writer and Copywriter',
+      });
+      expect(res.passed).toBe(false);
+      expect(res.reason).toContain('non-developer job role title');
+    });
+
+    it('rejects non-dev title: Virtual Assistant', () => {
+      const res = checkDeveloperRole({
+        ...baseJob,
+        title: 'Virtual Assistant for Founder',
+      });
+      expect(res.passed).toBe(false);
+      expect(res.reason).toContain('non-developer job role title');
     });
   });
 

@@ -15,6 +15,8 @@ export interface BlackfalconActorInput {
   descriptionMaxLength: number;
   excludeEmptyFields: boolean;
   enrichDetails: boolean;
+  skipReposts?: boolean;
+  minClientTotalSpent?: number;
 }
 
 export function buildActorQuery(keywords: readonly string[] = KEYWORDS): string {
@@ -43,6 +45,8 @@ export function buildBlackfalconActorInput(
     descriptionMaxLength: 0,
     excludeEmptyFields: false,
     enrichDetails: false,
+    skipReposts: true,
+    minClientTotalSpent: 100,
   };
 }
 
